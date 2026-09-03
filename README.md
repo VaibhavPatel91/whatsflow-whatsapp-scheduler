@@ -1,36 +1,73 @@
-# WhatsApp Personal Group Message Scheduler
+# WhatsFlow — WhatsApp Message Scheduler & Automation Studio 🚀
 
-A local web application built with **Next.js**, **Express**, **TypeScript**, and **Playwright** that allows scheduling exactly two daily pre-written WhatsApp messages to a selected WhatsApp group with a configurable gap (default: 120 minutes), operating without the WhatsApp Business API.
+A modern, powerful, local open-source **WhatsApp Message Scheduler** built with **Next.js**, **Express**, **TypeScript**, and **Playwright**. **WhatsFlow** allows you to **schedule WhatsApp messages** to specific WhatsApp groups or chats for any date and time, running entirely on your local machine without needing the official WhatsApp Business API.
+
+---
+
+## 💡 How This Project Works (Plain & Simple English)
+
+**WhatsFlow** acts as your personal virtual assistant for WhatsApp. Here is how it works step-by-step in simple terms:
+
+1. **Configure Your Message Task**:
+   - Go to the **Schedule** page on the web dashboard.
+   - Type or select your target **WhatsApp Group Name** (e.g. `Finance`, `Office Team`, or `Family`).
+   - Write your message content, choose your **Schedule Date** and **Send Time** (e.g. `2026-09-05` at `10:00 AM`), and click **Save & Activate Task**.
+
+2. **Local Database Storage**:
+   - WhatsFlow saves your scheduled task safely in a local SQLite database (`database/sqlite.db`) on your computer.
+
+3. **Smart Time Polling**:
+   - A lightweight background process (worker) on your machine monitors the clock.
+   - Your browser stays **closed** while waiting for the scheduled time, consuming zero extra RAM or CPU.
+
+4. **Automated & Safe Dispatch**:
+   - When the exact date and time arrives, WhatsFlow automatically launches a headless or visible Playwright Chromium browser.
+   - It navigates to WhatsApp Web using your saved login session.
+   - It searches for your target group, opens the chat, verifies that the chat header title matches your group name (preventing any wrong sends), types your message, and clicks send.
+   - Once sent, **it automatically closes the browser tab** and logs the dispatch status on your dashboard timeline!
 
 ---
 
 > [!WARNING]
 > **UNOFFICIAL WHATSAPP AUTOMATION NOTICE**
-> WhatsApp Web browser automation is unofficial and not supported by Meta/WhatsApp. Automated interactions may violate WhatsApp Terms of Service and risk account temporary suspension or restrictions. This software is built exclusively for personal, low-frequency scheduling (2 messages/day) in group chats where your account is already an active member. Operate responsibly.
+> WhatsFlow uses Playwright browser automation on your local computer. It does not use the official WhatsApp Business API. Automated interactions may violate WhatsApp Terms of Service if abused. This software is designed exclusively for personal, low-frequency daily scheduling in group chats where your account is already an active member. Operate responsibly.
 
 ---
 
-## Features
+## ✨ Key Features (WhatsFlow V2)
 
-- **Personal Daily Scheduling**: Schedule Message 1 at a chosen time (e.g. 10:00 AM) and Message 2 automatically after a gap (e.g. 120 mins &rarr; 12:00 PM).
-- **Persistent Playwright Session**: Launches Chromium with a persistent local browser profile (`data/whatsapp-profile/`), retaining WhatsApp Web authentication across worker restarts.
-- **Group Safety Verification**: Before typing or clicking send, the worker strictly verifies that the active open chat header title matches the targeted group name.
-- **Idempotency & Duplicate Prevention**: Structured idempotency keys (`scheduleId_YYYY-MM-DD_messageNum`) guarantee that messages are never re-sent upon worker restarts.
-- **Live Next.js Dashboard**: Visual status badges (`CONNECTED`, `WAITING_FOR_QR`, `DISCONNECTED`), today's dispatch timeline, job history logs, and manual schedule toggles.
-- **Zero-Config Local SQLite Database**: Auto-initialized WAL-enabled database storing schedules and job execution logs locally.
+- **Schedule WhatsApp Messages for Any Group**: Easily schedule messages for any personal or work WhatsApp group (e.g. `Finance`, `Office`, `Marketing`).
+- **Multi-Task & Multi-Group Scheduling**: Create, edit, toggle, and delete multiple independent scheduled messages for different WhatsApp groups concurrently.
+- **Specific Date & Send Time Selection**: Choose exact calendar dates (`YYYY-MM-DD`) and times (`HH:mm`) with timezone support (e.g. `Asia/Kolkata`, `UTC`, `EST`).
+- **Smart Group Autocomplete**: Direct text input with dynamic `<datalist>` suggestions populated from your saved schedules and detected groups.
+- **Auto-Close Browser Engine**: Chromium only opens when a message dispatch is due and automatically closes immediately after sending to keep system memory light.
+- **Header Safety Title Verification**: Playwright strictly checks the open chat header title (`#main header`) before typing to ensure 100% accurate recipient verification.
+- **Idempotency & Duplicate Prevention**: Unique idempotency keys prevent messages from ever being sent twice, even if the worker process restarts.
+- **Live 2-Column Dashboard**: High-contrast modern UI featuring live **WhatsApp Web State** monitoring, **System Web State** (network online/offline check), active daily schedules, and today's dispatch timeline.
+- **100% Private Local Session Storage**: Your WhatsApp login session stays encrypted locally in `worker/data/whatsapp-profile/`. No data or tokens are ever sent to remote servers.
 
 ---
 
-## Architecture Overview
+## 🛠️ Technology Stack
+
+- **Frontend Dashboard**: Next.js 14 (App Router), React 18, Tailwind CSS, Lucide Icons
+- **Backend API**: Node.js, Express, TypeScript, Zod Validation
+- **Automation Engine**: Playwright (Chromium persistent context)
+- **Database**: SQLite (`better-sqlite3` with WAL mode)
+- **Timezone & Date Math**: Luxon
+
+---
+
+## 📂 Project Architecture
 
 ```
-whatsapp-scheduler/
-├── frontend/       # Next.js 14 App Router UI (Tailwind CSS, Lucide icons)
-├── backend/        # Express REST API (Zod validation, SQLite DB routes)
-├── worker/         # Playwright Chromium engine & cron polling scheduler
-├── shared/         # Shared TypeScript interfaces, DB repositories & time math
-├── database/       # SQL schema and SQLite database storage (sqlite.db)
-├── data/           # Persistent Playwright profile (whatsapp-profile/) [GITIGNORED]
+WhatsappTextAutomation/
+├── frontend/       # Next.js 14 App Router Dashboard UI (Port 3000)
+├── backend/        # Express REST API Server (Port 4000)
+├── worker/         # Playwright Chromium Engine & Task Poller
+├── shared/         # Shared TypeScript Types, DB Repositories & Luxon Math
+├── database/       # SQLite database file (sqlite.db)
+├── worker/data/    # Saved WhatsApp Web session profile [GITIGNORED]
 ├── .env.example
 ├── package.json
 └── README.md
@@ -38,112 +75,61 @@ whatsapp-scheduler/
 
 ---
 
-## Technology Stack
+## ⚙️ Prerequisites
 
-- **Frontend**: Next.js 14, React 18, Tailwind CSS, Lucide Icons, React Hook Form, Zod
-- **Backend API**: Node.js, Express, TypeScript, Zod, Helmet, CORS
-- **Automation Worker**: Playwright (Chromium persistent context)
-- **Database**: SQLite (`better-sqlite3`) / PostgreSQL-ready
-- **Scheduler & Date Math**: Luxon (Timezone & midnight roll-over calculations)
+- **Node.js**: `v18.0.0` or higher (Node `v20.x` recommended)
+- **npm**: `v9.0.0` or higher
+- **Operating System**: macOS, Linux, or Windows
 
 ---
 
-## Prerequisites
+## 🚀 Quick Start Guide
 
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- **Operating System**: macOS, Linux, or Windows (Mac OS Sonoma/Sequoia tested)
+### 1. Clone & Install Dependencies
 
----
+```bash
+git clone https://github.com/VaibhavPatel91/WhatsappTextAutomation.git
+cd WhatsappTextAutomation
+npm install
+```
 
-## Installation & Setup
+### 2. Install Playwright Chromium
 
-1. **Clone & Install Dependencies**:
-   ```bash
-   npm install
-   ```
+```bash
+npx playwright install chromium
+```
 
-2. **Install Playwright Chromium Browser**:
-   ```bash
-   npx playwright install chromium
-   ```
+### 3. Run WhatsFlow
 
-3. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env
-   ```
-
----
-
-## Running the Application
-
-Run frontend, backend, and Playwright worker concurrently in development mode:
+Start the dashboard, API server, and automation worker together in one command:
 
 ```bash
 npm run dev
 ```
 
-Alternatively, launch services individually in separate terminals:
-
-```bash
-# Terminal 1: Express REST API (Port 4000)
-npm run dev:backend
-
-# Terminal 2: Playwright Worker Engine
-npm run dev:worker
-
-# Terminal 3: Next.js Dashboard (Port 3000)
-npm run dev:web
-```
-
-Access the dashboard at **[http://localhost:3000](http://localhost:3000)**.
+Open your browser and navigate to **[http://localhost:3000](http://localhost:3000)**.
 
 ---
 
-## Initial WhatsApp QR Setup
+## 📱 Initial WhatsApp Web QR Setup
 
 1. Open the dashboard at `http://localhost:3000`.
-2. Click **Launch & Connect WhatsApp** (or run `npm run dev:worker`).
-3. A visible Chromium browser window will launch automatically.
-4. On your mobile phone, open **WhatsApp &rarr; Linked Devices &rarr; Link a Device**.
-5. Scan the QR code displayed in the Chromium browser window.
-6. Once authenticated, the dashboard status badge will switch to **CONNECTED**.
-7. The browser context is saved locally to `./data/whatsapp-profile` and will remain authenticated across app restarts.
+2. On the left panel under **WhatsApp Web State**, click **Verify Live Session in Browser**.
+3. A Chromium browser window will open to `https://web.whatsapp.com`.
+4. Open WhatsApp on your phone &rarr; **Linked Devices** &rarr; **Link a Device**.
+5. Scan the QR code shown in the Chromium window.
+6. Once logged in, your session is saved locally in `./worker/data/whatsapp-profile/`. You do not need to scan QR code again!
 
 ---
 
-## How Automatic Sending Works
+## 🔒 Privacy & Security
 
-1. Navigate to **`/schedule`** in the dashboard.
-2. Select your target WhatsApp group name (e.g. `Office Team`).
-3. Enter **Message 1** (e.g. `Good morning everyone!`).
-4. Enter **Message 2** (e.g. `Today's update will be shared shortly.`).
-5. Select **First Send Time** (e.g. `10:00 AM`).
-6. Set **Gap Minutes** (default `120` minutes). The dashboard will preview Message 2 send time as `12:00 PM`.
-7. Click **Save & Activate Schedule**.
-8. The worker polls every 15 seconds:
-   - At 10:00 AM, the worker searches for `Office Team`, verifies active header title matches, sends Message 1, and marks job `SENT`.
-   - At 12:00 PM, the worker sends Message 2 and marks job `SENT`.
+- **Local Storage Only**: All database records and session files stay locally on your computer.
+- **Git Safety**: The `worker/data/whatsapp-profile/` directory containing your session cookies is strictly `.gitignore` protected.
+- **No Remote Calls**: WhatsFlow does not communicate with external analytics or third-party cloud services.
 
 ---
 
-## Security & Privacy Guidelines
-
-- **Session Isolation**: Playwright profile credentials are stored in `data/whatsapp-profile/` which is strictly included in `.gitignore`. Never commit session data to Git repositories.
-- **No Password Storage**: Authentication relies entirely on WhatsApp Web QR code pairing.
-- **Header Verification**: Message dispatches verify that the open chat header title matches target string to prevent mis-sending.
-- **Local Network Scoping**: The Express API runs on `localhost` by default.
-
----
-
-## Troubleshooting
-
-- **WhatsApp Disconnected**: Re-launch the worker via `npm run dev:worker` or click Connect in Settings. If session expired, rescan the QR code.
-- **Group Not Found**: Ensure your WhatsApp account is an existing member of the target group and that the group name is spelled identically.
-- **Port Conflict (4000 / 3000)**: Change `PORT` in `.env` if 4000 or 3000 is occupied.
-
----
-
-## License
+## 📄 License
 
 Personal & Educational Use Only.
