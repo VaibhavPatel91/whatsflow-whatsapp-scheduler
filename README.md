@@ -4,13 +4,13 @@ A modern, powerful, local open-source **WhatsApp Message Scheduler** built with 
 
 ---
 
-## 💡 How This Project Works (Plain & Simple English)
+## 💡 How This Project Works
 
 **WhatsFlow** acts as your personal virtual assistant for WhatsApp. Here is how it works step-by-step in simple terms:
 
 1. **Configure Your Message Task**:
    - Go to the **Schedule** page on the web dashboard.
-   - Type or select your target **WhatsApp Group Name** (e.g. `Finance`, `Office Team`, or `Family`).
+   - Type or select your target **WhatsApp Group Name** (e.g. `Friends`, `Office Team`, or `Family`).
    - Write your message content, choose your **Schedule Date** and **Send Time** (e.g. `2026-09-05` at `10:00 AM`), and click **Save & Activate Task**.
 
 2. **Local Database Storage**:
@@ -34,7 +34,7 @@ A modern, powerful, local open-source **WhatsApp Message Scheduler** built with 
 
 ---
 
-## ✨ Key Features (WhatsFlow V2)
+## ✨ Key Features (WhatsFlow)
 
 - **Schedule WhatsApp Messages for Any Group**: Easily schedule messages for any personal or work WhatsApp group (e.g. `Finance`, `Office`, `Marketing`).
 - **Multi-Task & Multi-Group Scheduling**: Create, edit, toggle, and delete multiple independent scheduled messages for different WhatsApp groups concurrently.
