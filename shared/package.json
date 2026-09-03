@@ -1,0 +1,22 @@
+{
+  "name": "whatsapp-scheduler-shared",
+  "version": "1.0.0",
+  "description": "Shared modules, DB repositories, types, and scheduler logic",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "luxon": "^3.4.4",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/jest": "^29.5.12",
+    "@types/luxon": "^3.4.2",
+    "@types/node": "^20.11.24",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.3.3"
+  }
+}

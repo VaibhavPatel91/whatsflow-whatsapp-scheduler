@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-group-scheduler",
+  "version": "1.0.0",
+  "description": "Local web application to schedule two daily WhatsApp messages to a selected group via Playwright automation.",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:worker\" \"npm run dev:web\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:worker": "npm --prefix worker run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix worker run build && npm --prefix frontend run build",
+    "start": "concurrently \"npm --prefix backend run start\" \"npm --prefix worker run start\" \"npm --prefix frontend run start\"",
+    "test": "npm --prefix backend run test && npm --prefix worker run test",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix worker run typecheck && npm --prefix frontend run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
