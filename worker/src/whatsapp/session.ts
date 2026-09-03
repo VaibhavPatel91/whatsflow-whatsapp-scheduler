@@ -116,15 +116,14 @@ export class WhatsAppSession {
     if (!this.page || this.page.isClosed()) {
       this.context = null;
       this.page = null;
-      connectionRepository.updateStatus('DISCONNECTED');
-      return 'DISCONNECTED';
+      const current = connectionRepository.get();
+      return current.status || 'DISCONNECTED';
     }
 
     if (this.page.url() === 'about:blank' || this.page.url() === '') {
       await this.page.goto('https://web.whatsapp.com', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
       await this.page.bringToFront().catch(() => {});
     }
-
 
     try {
       // Check if sidebar / main chat list exists (CONNECTED)
@@ -136,7 +135,7 @@ export class WhatsAppSession {
         }
       }
 
-      // Check if QR code is visible (WAITING_FOR_QR)
+      // Check if QR code container is visible (WAITING_FOR_QR)
       const qrLocators = SELECTORS.qrContainer;
       for (const sel of qrLocators) {
         if (await this.page.locator(sel).isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -145,23 +144,25 @@ export class WhatsAppSession {
         }
       }
 
-      // If neither visible yet, wait briefly and poll safely
-      await this.page.waitForTimeout(1000).catch(() => {});
-      if (this.page.isClosed()) {
-        this.context = null;
-        this.page = null;
-        connectionRepository.updateStatus('DISCONNECTED');
-        return 'DISCONNECTED';
+      // Give WhatsApp Web DOM up to 3 extra seconds to finish rendering
+      await this.page.waitForTimeout(3000).catch(() => {});
+
+      for (const sel of sideBarLocators) {
+        if (await this.page.locator(sel).isVisible({ timeout: 1000 }).catch(() => false)) {
+          connectionRepository.updateStatus('CONNECTED');
+          return 'CONNECTED';
+        }
       }
 
-      const isConnected = await this.page.locator(SELECTORS.sideBar[0]).isVisible().catch(() => false);
-      if (isConnected) {
-        connectionRepository.updateStatus('CONNECTED');
-        return 'CONNECTED';
+      for (const sel of qrLocators) {
+        if (await this.page.locator(sel).isVisible({ timeout: 1000 }).catch(() => false)) {
+          connectionRepository.updateStatus('WAITING_FOR_QR');
+          return 'WAITING_FOR_QR';
+        }
       }
 
-      connectionRepository.updateStatus('WAITING_FOR_QR');
-      return 'WAITING_FOR_QR';
+      connectionRepository.updateStatus('CONNECTING');
+      return 'CONNECTING';
     } catch (err: any) {
       console.error('[WhatsAppSession] Auth status check error:', err);
       if (err.message && err.message.includes('closed')) {
@@ -175,22 +176,10 @@ export class WhatsAppSession {
     }
   }
 
-
-  public getPage(): Page | null {
-    if (this.page && !this.page.isClosed()) {
-      if (this.page.url() === 'about:blank' || this.page.url() === '') {
-        this.page.goto('https://web.whatsapp.com', { waitUntil: 'domcontentloaded' }).catch(() => {});
-      }
-      this.page.bringToFront().catch(() => {});
-    }
-    return this.page;
-  }
-
-
   public async disconnect(): Promise<void> {
     try {
       if (this.context) {
-        await this.context.close();
+        await this.context.close().catch(() => {});
         this.context = null;
         this.page = null;
       }
@@ -207,11 +196,12 @@ export class WhatsAppSession {
         this.context = null;
         this.page = null;
       }
-      connectionRepository.updateStatus('DISCONNECTED');
     } catch (err: any) {
       console.error('[WhatsAppSession] Error closing browser window:', err);
     }
   }
+
+
 
 
   public async getAvailableGroups(): Promise<Array<{ id: string; name: string }>> {

@@ -4,9 +4,15 @@ import { Navbar } from '@/components/Navbar';
 import { WarningBanner } from '@/components/WarningBanner';
 
 export const metadata: Metadata = {
-  title: 'WhatsApp Group Message Scheduler',
+  title: 'WhatsFlow - WhatsApp Group Automation Studio',
   description: 'Local personal WhatsApp group message scheduler with Playwright automation.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/icon.png',
+  },
 };
+
 
 export default function RootLayout({
   children,
@@ -22,9 +28,10 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
-          WhatsApp Personal Group Message Scheduler &bull; Local Playwright Automation Engine
+          WhatsFlow &bull; Local Playwright WhatsApp Automation Studio
         </footer>
       </body>
     </html>
   );
 }
+

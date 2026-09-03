@@ -10,13 +10,15 @@ export const schedulesRouter = Router();
 const createScheduleSchema = z.object({
   groupId: z.string().min(1, 'Group is required'),
   groupName: z.string().min(1, 'Group Name is required'),
-  message1: z.string().min(1, 'Message 1 is required'),
-  message2: z.string().min(1, 'Message 2 is required'),
-  firstSendTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'First send time must be in HH:mm format'),
-  gapMinutes: z.number().min(1, 'Gap minutes must be at least 1').default(120),
+  message1: z.string().min(1, 'Message is required'),
+  message2: z.string().optional().default(''),
+  firstSendTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Send time must be in HH:mm format'),
+  gapMinutes: z.number().optional().default(0),
   timezone: z.string().default('Asia/Kolkata'),
+  targetDate: z.string().optional().default(''),
   enabled: z.boolean().default(true)
 });
+
 
 // GET /api/schedules
 schedulesRouter.get('/', (req: Request, res: Response) => {
@@ -39,17 +41,20 @@ schedulesRouter.post('/', (req: Request, res: Response) => {
       first_send_time: data.firstSendTime,
       gap_minutes: data.gapMinutes,
       timezone: data.timezone,
+      target_date: data.targetDate || undefined,
       enabled: data.enabled
     });
 
-    // Create jobs for today and tomorrow if enabled
+    // Create jobs for target date if enabled
     if (newSchedule.enabled) {
       const now = DateTime.now().setZone(newSchedule.timezone);
       const todayStr = now.toFormat('yyyy-MM-dd');
-      const tomorrowStr = now.plus({ days: 1 }).toFormat('yyyy-MM-dd');
+      const runDate = newSchedule.target_date || todayStr;
 
-      ensureJobsForDate(newSchedule, todayStr);
-      ensureJobsForDate(newSchedule, tomorrowStr);
+      ensureJobsForDate(newSchedule, runDate);
+      if (!newSchedule.target_date) {
+        ensureJobsForDate(newSchedule, now.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+      }
     }
 
     res.status(201).json(newSchedule);
@@ -82,22 +87,27 @@ schedulesRouter.patch('/:id', (req: Request, res: Response) => {
       first_send_time: req.body.firstSendTime,
       gap_minutes: req.body.gapMinutes,
       timezone: req.body.timezone,
+      target_date: req.body.targetDate,
       enabled: req.body.enabled
     });
 
     if (updated) {
       const now = DateTime.now().setZone(updated.timezone);
       const todayStr = now.toFormat('yyyy-MM-dd');
+      const runDate = updated.target_date || todayStr;
 
-      // Clear today's jobs for this schedule so updated time and exact target group take effect
+      // Clear pending jobs for this schedule so updated time/date takes effect
       const db = require('../../../shared/src/db').getDb();
-      db.prepare("DELETE FROM scheduled_jobs WHERE schedule_id = ? AND run_date = ?").run(updated.id, todayStr);
+      db.prepare("DELETE FROM scheduled_jobs WHERE schedule_id = ? AND status = 'PENDING'").run(updated.id);
 
       if (updated.enabled) {
-        ensureJobsForDate(updated, todayStr);
-        ensureJobsForDate(updated, now.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+        ensureJobsForDate(updated, runDate);
+        if (!updated.target_date) {
+          ensureJobsForDate(updated, now.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+        }
       }
     }
+
 
 
     res.json(updated);

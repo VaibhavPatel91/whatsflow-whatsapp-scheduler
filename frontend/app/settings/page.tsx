@@ -54,7 +54,7 @@ export default function SettingsPage() {
       </div>
 
       {msg && (
-        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-sm text-slate-200">
+        <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/30 text-sm text-emerald-400">
           {msg}
         </div>
       )}
@@ -93,19 +93,28 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Legal & Safety Disclaimer Card */}
+      {/* Permanent Legal & Safety Disclaimer Card */}
       <div className="bg-amber-500/10 p-6 rounded-2xl border border-amber-500/20 space-y-4 text-amber-200 text-sm">
-        <h3 className="text-base font-bold text-amber-300 flex items-center space-x-2">
-          <ShieldAlert className="w-5 h-5 text-amber-400" />
-          <span>Safety & Terms Compliance Policy</span>
-        </h3>
+        <div className="pb-3 border-b border-amber-500/20">
+          <h3 className="text-base font-bold text-amber-300 flex items-center space-x-2">
+            <ShieldAlert className="w-5 h-5 text-amber-400" />
+            <span>Safety & Terms Compliance Policy</span>
+          </h3>
+        </div>
+
+        <p className="text-xs text-amber-300/90 leading-relaxed font-semibold">
+          Unofficial WhatsApp Automation Notice: This software uses Playwright browser automation on your local machine. It does not use the WhatsApp Business API. Operate responsibly for personal daily messages only.
+        </p>
+
         <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-amber-200/90">
           <li>This application uses standard DOM manipulation via Playwright Chromium to automate WhatsApp Web on your personal computer.</li>
-          <li>It is designed exclusively for personal, low-frequency messaging (up to 2 messages/day) to groups in which your account is already a member.</li>
+          <li>It is designed exclusively for personal, low-frequency messaging to groups in which your account is already a member.</li>
           <li>Mass marketing, contact scraping, unsolicited messaging, or CAPTCHA bypass techniques are strictly prohibited and intentionally not implemented.</li>
           <li>Always keep the browser context private on your own device. Session cookies and QR tokens are never uploaded or stored on remote servers.</li>
         </ul>
       </div>
     </div>
   );
+
+
 }

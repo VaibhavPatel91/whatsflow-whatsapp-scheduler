@@ -32,11 +32,22 @@ async function main() {
   process.on('SIGTERM', shutdown);
 }
 
-// Trigger reload with auto-close browser window post-dispatch
+// Trigger reload with empirical DOM auth status detection
 main().catch((err) => {
   console.error('[Worker Main] Fatal error launching worker:', err);
   process.exit(1);
 });
+
+
+
+
+
+
+
+
+
+
+
 
 
 

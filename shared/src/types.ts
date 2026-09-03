@@ -23,6 +23,7 @@ export interface Schedule {
   first_send_time: string; // HH:mm
   gap_minutes: number;
   timezone: string;
+  target_date?: string; // YYYY-MM-DD
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -60,9 +61,11 @@ export interface CreateScheduleInput {
   groupId: string;
   groupName: string;
   message1: string;
-  message2: string;
+  message2?: string;
   firstSendTime: string;
   gapMinutes?: number;
   timezone?: string;
+  targetDate?: string;
   enabled?: boolean;
 }
+

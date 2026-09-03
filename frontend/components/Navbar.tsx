@@ -19,19 +19,21 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Brand */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <MessageSquare className="w-6 h-6 text-slate-950 font-bold" />
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-emerald-500/20 border border-emerald-500/30 group-hover:scale-105 transition-transform bg-slate-900 flex items-center justify-center">
+              <img src="/icon.png" alt="WhatsFlow Logo" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <span className="text-lg font-bold bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
-                WA Group Scheduler
+            <div className="flex items-center space-x-2">
+              <span className="text-xl font-black bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-300 bg-clip-text text-transparent tracking-tight">
+                WhatsFlow
               </span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-                Personal Edition
+              <span className="hidden sm:inline-block px-2.5 py-0.5 text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-full shadow-sm">
+                Pro Studio
               </span>
             </div>
-          </div>
+          </Link>
+
+
 
           {/* Navigation Links */}
           <nav className="flex space-x-1 sm:space-x-2">

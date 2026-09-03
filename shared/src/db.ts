@@ -63,6 +63,13 @@ export function getDb() {
   return db;
 }
 
+// Ensure target_date column exists
+try {
+  db.exec("ALTER TABLE schedules ADD COLUMN target_date TEXT;");
+} catch {
+  // column already exists
+}
+
 // Schedules Repository
 export const scheduleRepository = {
   getAll(): Schedule[] {
@@ -78,8 +85,8 @@ export const scheduleRepository = {
 
   create(schedule: Omit<Schedule, 'created_at' | 'updated_at'>): Schedule {
     const stmt = db.prepare(`
-      INSERT INTO schedules (id, group_id, group_name, message_1, message_2, first_send_time, gap_minutes, timezone, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      INSERT INTO schedules (id, group_id, group_name, message_1, message_2, first_send_time, gap_minutes, timezone, target_date, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `);
     stmt.run(
       schedule.id,
@@ -90,6 +97,7 @@ export const scheduleRepository = {
       schedule.first_send_time,
       schedule.gap_minutes,
       schedule.timezone,
+      schedule.target_date || null,
       schedule.enabled ? 1 : 0
     );
     return this.getById(schedule.id)!;
@@ -109,6 +117,7 @@ export const scheduleRepository = {
     if (updates.first_send_time !== undefined) { fields.push('first_send_time = ?'); values.push(updates.first_send_time); }
     if (updates.gap_minutes !== undefined) { fields.push('gap_minutes = ?'); values.push(updates.gap_minutes); }
     if (updates.timezone !== undefined) { fields.push('timezone = ?'); values.push(updates.timezone); }
+    if (updates.target_date !== undefined) { fields.push('target_date = ?'); values.push(updates.target_date); }
     if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
 
     if (fields.length === 0) return current;
@@ -121,6 +130,7 @@ export const scheduleRepository = {
 
     return this.getById(id);
   },
+
 
   delete(id: string): boolean {
     const res = db.prepare('DELETE FROM schedules WHERE id = ?').run(id);
@@ -212,6 +222,7 @@ export const connectionRepository = {
     return row || { id: 'default', status: 'DISCONNECTED', updated_at: new Date().toISOString() };
   },
 
+
   updateStatus(status: WhatsAppStatus, lastError?: string | null): WhatsAppConnectionRecord {
     const lastConnected = status === 'CONNECTED' ? new Date().toISOString() : undefined;
     if (lastConnected) {
@@ -230,3 +241,4 @@ export const connectionRepository = {
     return this.get();
   }
 };
+

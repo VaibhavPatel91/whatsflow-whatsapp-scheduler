@@ -15,14 +15,17 @@ whatsappRouter.get('/status', (req: Request, res: Response) => {
 });
 
 // POST /api/whatsapp/connect
-whatsappRouter.post('/connect', (req: Request, res: Response) => {
-  // Triggers worker connection check / status update
-  const connection = connectionRepository.get();
-  if (connection.status === 'DISCONNECTED') {
-    connectionRepository.updateStatus('CONNECTING');
+whatsappRouter.post('/connect', async (req: Request, res: Response) => {
+  try {
+    const { WhatsAppSession } = require('../../../worker/src/whatsapp/session');
+    const session = WhatsAppSession.getInstance();
+    const status = await session.init();
+    res.json({ message: 'WhatsApp session verified', status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || String(err) });
   }
-  res.json({ message: 'WhatsApp connection triggered', connection: connectionRepository.get() });
 });
+
 
 // POST /api/whatsapp/disconnect
 whatsappRouter.post('/disconnect', (req: Request, res: Response) => {

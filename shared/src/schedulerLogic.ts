@@ -39,16 +39,19 @@ export function generateIdempotencyKey(scheduleId: string, runDateStr: string, m
 export function ensureJobsForDate(schedule: Schedule, targetDateStr: string): ScheduledJob[] {
   if (!schedule.enabled) return [];
 
-  const { message1Time, message2Time } = calculateJobTimes(
-    schedule.first_send_time,
-    schedule.gap_minutes,
-    targetDateStr,
-    schedule.timezone
-  );
+  const [hours, minutes] = schedule.first_send_time.split(':').map(Number);
+  const message1Time = DateTime.fromISO(`${targetDateStr}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`, { zone: schedule.timezone });
+  const nowInZone = DateTime.now().setZone(schedule.timezone);
+
+  // If the target date & time has already passed (over 1 min ago), do NOT create a pending job for it
+  if (message1Time < nowInZone.minus({ minutes: 1 })) {
+    return [];
+  }
 
   const createdJobs: ScheduledJob[] = [];
 
-  // Job 1
+
+  // Single Job per day (Message 1)
   const key1 = generateIdempotencyKey(schedule.id, targetDateStr, 1);
   let existing1 = jobRepository.getByIdempotencyKey(key1);
 
@@ -83,41 +86,7 @@ export function ensureJobsForDate(schedule: Schedule, targetDateStr: string): Sc
     createdJobs.push(existing1);
   }
 
-  // Job 2
-  const key2 = generateIdempotencyKey(schedule.id, targetDateStr, 2);
-  let existing2 = jobRepository.getByIdempotencyKey(key2);
-
-  if (existing2 && (existing2.status === 'CANCELLED' || existing2.status === 'FAILED')) {
-    jobRepository.delete(existing2.id);
-    existing2 = null;
-  }
-
-  if (!existing2) {
-    const job2: ScheduledJob = {
-      id: uuidv4(),
-      schedule_id: schedule.id,
-      run_date: targetDateStr,
-      message_number: 2,
-      scheduled_at: message2Time.toUTC().toISO() || new Date().toISOString(),
-      status: 'PENDING',
-      idempotency_key: key2,
-      attempts: 0,
-      sent_at: null,
-      error_message: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    createdJobs.push(jobRepository.create(job2));
-  } else {
-    const targetIso2 = message2Time.toUTC().toISO();
-    if (existing2.status === 'PENDING' && targetIso2 && existing2.scheduled_at !== targetIso2) {
-      const db = require('./db').getDb();
-      db.prepare("UPDATE scheduled_jobs SET scheduled_at = ?, updated_at = datetime('now') WHERE id = ?").run(targetIso2, existing2.id);
-      existing2 = jobRepository.getById(existing2.id)!;
-    }
-    createdJobs.push(existing2);
-  }
-
   return createdJobs;
 }
+
 

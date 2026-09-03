@@ -1,27 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight } from 'lucide-react';
 
-interface WhatsAppGroup {
-  id: string;
-  name: string;
-}
-
-export default function SchedulePage() {
+function ScheduleForm() {
   const router = useRouter();
-  const [groups, setGroups] = useState<WhatsAppGroup[]>([]);
+  const searchParams = useSearchParams();
+  const scheduleIdParam = searchParams.get('id');
+
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [existingScheduleId, setExistingScheduleId] = useState<string | null>(null);
 
   // Form State
-  const [groupId, setGroupId] = useState('Office Team');
-  const [groupName, setGroupName] = useState('Office Team');
-  const [customGroupName, setCustomGroupName] = useState('');
+  const [groupName, setGroupName] = useState('');
   const [message1, setMessage1] = useState('Good morning everyone!');
-  const [message2, setMessage2] = useState("Today's update will be shared shortly.");
+  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [firstSendTime, setFirstSendTime] = useState('10:00');
-  const [gapMinutes, setGapMinutes] = useState(120);
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [enabled, setEnabled] = useState(true);
 
@@ -30,29 +25,37 @@ export default function SchedulePage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    // Fetch available groups & existing schedule
     const init = async () => {
       try {
         const [resGroups, resSchedules] = await Promise.all([
-          fetch('/api/whatsapp/groups').then(r => r.json()),
-          fetch('/api/schedules').then(r => r.json())
+          fetch('/api/whatsapp/groups').then(r => r.json()).catch(() => []),
+          fetch('/api/schedules').then(r => r.json()).catch(() => [])
         ]);
 
-        if (Array.isArray(resGroups) && resGroups.length > 0) {
-          setGroups(resGroups);
+        const groupNamesSet = new Set<string>();
+        if (Array.isArray(resSchedules)) {
+          resSchedules.forEach((s: any) => {
+            if (s.group_name) groupNamesSet.add(s.group_name);
+          });
         }
+        if (Array.isArray(resGroups)) {
+          resGroups.forEach((g: any) => {
+            if (g.name) groupNamesSet.add(g.name);
+          });
+        }
+        setSuggestions(Array.from(groupNamesSet));
 
-        if (Array.isArray(resSchedules) && resSchedules.length > 0) {
-          const s = resSchedules[0];
-          setExistingScheduleId(s.id);
-          setGroupId(s.group_id);
-          setGroupName(s.group_name);
-          setMessage1(s.message_1);
-          setMessage2(s.message_2);
-          setFirstSendTime(s.first_send_time);
-          setGapMinutes(s.gap_minutes);
-          setTimezone(s.timezone);
-          setEnabled(s.enabled);
+        if (scheduleIdParam) {
+          const s = await fetch(`/api/schedules/${scheduleIdParam}`).then(r => r.json());
+          if (s && s.id) {
+            setExistingScheduleId(s.id);
+            setGroupName(s.group_name);
+            setMessage1(s.message_1);
+            if (s.target_date) setTargetDate(s.target_date);
+            setFirstSendTime(s.first_send_time);
+            setTimezone(s.timezone || 'Asia/Kolkata');
+            setEnabled(s.enabled);
+          }
         }
       } catch (err) {
         console.error('Error initializing schedule form:', err);
@@ -60,34 +63,7 @@ export default function SchedulePage() {
     };
 
     init();
-  }, []);
-
-  // Calculate Message 2 Send Time string for live preview
-  const calculateSecondTimePreview = () => {
-    try {
-      const [h, m] = firstSendTime.split(':').map(Number);
-      const totalMinutes = h * 60 + m + Number(gapMinutes);
-      const secondH = Math.floor((totalMinutes / 60) % 24);
-      const secondM = Math.floor(totalMinutes % 60);
-
-      const period = secondH >= 12 ? 'PM' : 'AM';
-      const displayH = secondH % 12 === 0 ? 12 : secondH % 12;
-      return `${displayH.toString().padStart(2, '0')}:${secondM.toString().padStart(2, '0')} ${period}`;
-    } catch {
-      return '--:--';
-    }
-  };
-
-  const handleGroupSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (val === 'CUSTOM') {
-      setGroupId('CUSTOM');
-      setGroupName(customGroupName || '');
-    } else {
-      setGroupId(val);
-      setGroupName(val);
-    }
-  };
+  }, [scheduleIdParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,8 +71,8 @@ export default function SchedulePage() {
     setSuccessMessage('');
     setErrorMessage('');
 
-    const targetGroup = groupId === 'CUSTOM' ? customGroupName : groupName;
-    if (!targetGroup.trim()) {
+    const targetGroup = groupName.trim();
+    if (!targetGroup) {
       setErrorMessage('Target WhatsApp Group Name is required.');
       setSaving(false);
       return;
@@ -107,10 +83,11 @@ export default function SchedulePage() {
         groupId: targetGroup,
         groupName: targetGroup,
         message1,
-        message2,
+        message2: '',
         firstSendTime,
-        gapMinutes: Number(gapMinutes),
+        gapMinutes: 0,
         timezone,
+        targetDate,
         enabled
       };
 
@@ -130,11 +107,11 @@ export default function SchedulePage() {
       }
 
       if (res.ok) {
-        setSuccessMessage('Schedule successfully saved! Pending daily jobs generated.');
-        setTimeout(() => router.push('/'), 1500);
+        setSuccessMessage(existingScheduleId ? 'Task updated & activated!' : 'New task scheduled & activated!');
+        setTimeout(() => router.push('/'), 1200);
       } else {
         const errData = await res.json();
-        setErrorMessage(errData.error || 'Failed to save schedule.');
+        setErrorMessage(errData.error || 'Failed to save task.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Error communicating with backend API.');
@@ -148,10 +125,10 @@ export default function SchedulePage() {
       <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
         <h1 className="text-2xl font-bold text-slate-100 flex items-center space-x-2">
           <Calendar className="w-6 h-6 text-emerald-400" />
-          <span>Configure Daily Message Schedule</span>
+          <span>{existingScheduleId ? 'Edit Scheduled Task' : 'Schedule New Task'}</span>
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Set up exactly two daily WhatsApp messages sent to a specific WhatsApp group with an automated gap.
+          Configure an automated WhatsApp message task for a specific date and time.
         </p>
       </div>
 
@@ -169,61 +146,67 @@ export default function SchedulePage() {
       )}
 
       <form onSubmit={handleSubmit} className="bg-slate-900/40 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6">
-        {/* WhatsApp Group Selection */}
+        {/* Target WhatsApp Group Name Input with Autocomplete Suggestions */}
         <div>
           <label className="block text-sm font-semibold text-slate-200 mb-2">
             Target WhatsApp Group Name *
           </label>
-          <select
-            value={groupId}
-            onChange={handleGroupSelectChange}
+          <input
+            type="text"
+            list="group-suggestions"
+            placeholder="Type group name or select from suggestions (e.g. Finance, Office)"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-          >
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
+            required
+            autoComplete="off"
+          />
+          <datalist id="group-suggestions">
+            {suggestions.map((name) => (
+              <option key={name} value={name} />
             ))}
-            <option value="CUSTOM">+ Enter Custom Group Name</option>
-          </select>
-
-          {groupId === 'CUSTOM' && (
-            <input
-              type="text"
-              placeholder="Exact WhatsApp Group Name"
-              value={customGroupName}
-              onChange={(e) => setCustomGroupName(e.target.value)}
-              className="mt-3 w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-              required
-            />
-          )}
+          </datalist>
           <p className="text-xs text-slate-500 mt-1.5">
-            The target group header name must match this string exactly before sending.
+            Select a previously created group or type any new WhatsApp group name.
           </p>
         </div>
 
-        {/* Message 1 Input */}
+        {/* Message Input */}
         <div>
-          <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-            <span>Message 1 *</span>
-            <span className="text-xs font-normal text-slate-400">First Daily Send</span>
+          <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>Message Content *</span>
           </label>
           <textarea
-            rows={3}
+            rows={4}
             value={message1}
             onChange={(e) => setMessage1(e.target.value)}
-            placeholder="e.g. Good morning everyone!"
+            placeholder="Type your WhatsApp message content here..."
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition resize-none"
             required
           />
         </div>
 
-        {/* First Send Time & Gap Duration */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Schedule Date, Send Time & Timezone */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
+              <Calendar className="w-4 h-4 text-emerald-400" />
+              <span>Schedule Date *</span>
+            </label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
+              required
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
               <Clock className="w-4 h-4 text-emerald-400" />
-              <span>First Send Time *</span>
+              <span>Send Time *</span>
             </label>
             <input
               type="time"
@@ -234,55 +217,6 @@ export default function SchedulePage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-200 mb-2">
-              Gap Between Messages (Minutes) *
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={gapMinutes}
-              onChange={(e) => setGapMinutes(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-              required
-            />
-          </div>
-        </div>
-
-        {/* Live Calculation Preview */}
-        <div className="bg-slate-950/80 p-4 rounded-xl border border-emerald-500/20 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400">Automatic Message 2 Time</div>
-              <div className="text-sm font-bold text-emerald-300">{calculateSecondTimePreview()}</div>
-            </div>
-          </div>
-          <div className="text-xs text-slate-500">
-            Calculated: {firstSendTime} + {gapMinutes} mins
-          </div>
-        </div>
-
-        {/* Message 2 Input */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-            <span>Message 2 *</span>
-            <span className="text-xs font-normal text-emerald-400">Sent Automatically at {calculateSecondTimePreview()}</span>
-          </label>
-          <textarea
-            rows={3}
-            value={message2}
-            onChange={(e) => setMessage2(e.target.value)}
-            placeholder="e.g. Today's update will be shared shortly."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition resize-none"
-            required
-          />
-        </div>
-
-        {/* Timezone & Enable Switch */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
           <div>
             <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
               <Globe className="w-4 h-4 text-emerald-400" />
@@ -299,19 +233,20 @@ export default function SchedulePage() {
               <option value="Europe/London">Europe/London (GMT)</option>
             </select>
           </div>
+        </div>
 
-          <div className="flex items-center space-x-3 pt-6">
-            <input
-              type="checkbox"
-              id="enabled"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
-            />
-            <label htmlFor="enabled" className="text-sm font-semibold text-slate-200 cursor-pointer">
-              Enable Daily Message Schedule
-            </label>
-          </div>
+        {/* Enable Switch */}
+        <div className="pt-4 border-t border-slate-800 flex items-center space-x-3">
+          <input
+            type="checkbox"
+            id="enabled"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
+          />
+          <label htmlFor="enabled" className="text-sm font-semibold text-slate-200 cursor-pointer">
+            Enable This Task
+          </label>
         </div>
 
         {/* Action Button */}
@@ -321,11 +256,23 @@ export default function SchedulePage() {
             disabled={saving}
             className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2"
           >
-            <span>{saving ? 'Saving Schedule...' : 'Save & Activate Schedule'}</span>
+            <span>{saving ? 'Saving Task...' : existingScheduleId ? 'Update Task' : 'Save & Activate Task'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </form>
     </div>
   );
+
 }
+
+export default function SchedulePage() {
+  return (
+    <Suspense fallback={<div className="text-center text-slate-400 py-10">Loading schedule configuration...</div>}>
+      <ScheduleForm />
+    </Suspense>
+  );
+}
+
+
+

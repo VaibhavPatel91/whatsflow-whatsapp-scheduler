@@ -38,13 +38,6 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
   isProcessingQueue = true;
 
   try {
-    // 0. Auto-recover session if disconnected or connecting
-    const connection = connectionRepository.get();
-    if (connection.status === 'DISCONNECTED' || connection.status === 'CONNECTING') {
-      const session = WhatsAppSession.getInstance();
-      await session.init().catch(() => {});
-    }
-
     // 1. Sync upcoming jobs for enabled schedules
     syncPendingJobsForActiveSchedules();
 
@@ -53,6 +46,13 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
     const dueJobs = jobRepository.getPendingJobsDue(nowIso);
 
     if (dueJobs.length > 0) {
+      // Auto-recover session ONLY when there are actual jobs due now
+      const connection = connectionRepository.get();
+      if (connection.status === 'DISCONNECTED' || connection.status === 'CONNECTING') {
+        const session = WhatsAppSession.getInstance();
+        await session.init().catch(() => {});
+      }
+
       console.log(`[Scheduler] Found ${dueJobs.length} pending job(s) due for execution.`);
 
       for (const job of dueJobs) {
@@ -63,6 +63,7 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
       }
     }
   } catch (err) {
+
     console.error('[Scheduler] Error during job poll cycle:', err);
   } finally {
     isProcessingQueue = false;
