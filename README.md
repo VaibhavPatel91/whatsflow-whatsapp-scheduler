@@ -61,7 +61,7 @@ A modern, powerful, local open-source **WhatsApp Message Scheduler** built with 
 ## 📂 Project Architecture
 
 ```
-WhatsappTextAutomation/
+whatsflow-whatsapp-scheduler/
 ├── frontend/       # Next.js 14 App Router Dashboard UI (Port 3000)
 ├── backend/        # Express REST API Server (Port 4000)
 ├── worker/         # Playwright Chromium Engine & Task Poller
@@ -88,10 +88,11 @@ WhatsappTextAutomation/
 ### 1. Clone & Install Dependencies
 
 ```bash
-git clone https://github.com/VaibhavPatel91/WhatsappTextAutomation.git
-cd WhatsappTextAutomation
+git clone https://github.com/VaibhavPatel91/whatsflow-whatsapp-scheduler.git
+cd whatsflow-whatsapp-scheduler
 npm install
 ```
+
 
 ### 2. Install Playwright Chromium
 

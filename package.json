@@ -1,7 +1,8 @@
 {
-  "name": "whatsapp-group-scheduler",
-  "version": "1.0.0",
-  "description": "Local web application to schedule two daily WhatsApp messages to a selected group via Playwright automation.",
+  "name": "whatsflow-whatsapp-scheduler",
+  "version": "2.0.0",
+  "description": "WhatsFlow — Local web application to schedule WhatsApp messages to selected groups via Playwright automation.",
+
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:worker\" \"npm run dev:web\"",
