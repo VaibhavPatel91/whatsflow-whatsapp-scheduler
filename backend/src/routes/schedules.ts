@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { DateTime } from 'luxon';
-import { scheduleRepository, jobRepository } from '../../../shared/src/db';
+import { scheduleRepository, jobRepository, resetDatabase } from '../../../shared/src/db';
 import { ensureJobsForDate } from '../../../shared/src/schedulerLogic';
 
 export const schedulesRouter = Router();
@@ -16,6 +16,8 @@ const createScheduleSchema = z.object({
   gapMinutes: z.number().optional().default(0),
   timezone: z.string().default('Asia/Kolkata'),
   targetDate: z.string().optional().default(''),
+  startDate: z.string().optional().default(''),
+  endDate: z.string().optional().default(''),
   enabled: z.boolean().default(true)
 });
 
@@ -41,7 +43,9 @@ schedulesRouter.post('/', (req: Request, res: Response) => {
       first_send_time: data.firstSendTime,
       gap_minutes: data.gapMinutes,
       timezone: data.timezone,
-      target_date: data.targetDate || undefined,
+      target_date: data.targetDate || data.startDate || undefined,
+      start_date: data.startDate || data.targetDate || undefined,
+      end_date: data.endDate || undefined,
       enabled: data.enabled
     });
 
@@ -49,11 +53,12 @@ schedulesRouter.post('/', (req: Request, res: Response) => {
     if (newSchedule.enabled) {
       const now = DateTime.now().setZone(newSchedule.timezone);
       const todayStr = now.toFormat('yyyy-MM-dd');
-      const runDate = newSchedule.target_date || todayStr;
+      const tomorrowStr = now.plus({ days: 1 }).toFormat('yyyy-MM-dd');
 
-      ensureJobsForDate(newSchedule, runDate);
-      if (!newSchedule.target_date) {
-        ensureJobsForDate(newSchedule, now.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+      ensureJobsForDate(newSchedule, todayStr);
+      ensureJobsForDate(newSchedule, tomorrowStr);
+      if (newSchedule.start_date && newSchedule.start_date > tomorrowStr) {
+        ensureJobsForDate(newSchedule, newSchedule.start_date);
       }
     }
 
@@ -62,6 +67,16 @@ schedulesRouter.post('/', (req: Request, res: Response) => {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation failed', details: err.errors });
     }
+    res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// POST /api/schedules/reset-database
+schedulesRouter.post('/reset-database', (req: Request, res: Response) => {
+  try {
+    resetDatabase();
+    res.json({ success: true, message: 'All database records have been wiped successfully.' });
+  } catch (err: any) {
     res.status(500).json({ error: err.message || String(err) });
   }
 });
@@ -87,23 +102,26 @@ schedulesRouter.patch('/:id', (req: Request, res: Response) => {
       first_send_time: req.body.firstSendTime,
       gap_minutes: req.body.gapMinutes,
       timezone: req.body.timezone,
-      target_date: req.body.targetDate,
+      target_date: req.body.startDate || req.body.targetDate || '',
+      start_date: req.body.startDate || req.body.targetDate || '',
+      end_date: req.body.endDate || '',
       enabled: req.body.enabled
     });
 
     if (updated) {
       const now = DateTime.now().setZone(updated.timezone);
       const todayStr = now.toFormat('yyyy-MM-dd');
-      const runDate = updated.target_date || todayStr;
+      const tomorrowStr = now.plus({ days: 1 }).toFormat('yyyy-MM-dd');
 
       // Clear pending jobs for this schedule so updated time/date takes effect
       const db = require('../../../shared/src/db').getDb();
       db.prepare("DELETE FROM scheduled_jobs WHERE schedule_id = ? AND status = 'PENDING'").run(updated.id);
 
       if (updated.enabled) {
-        ensureJobsForDate(updated, runDate);
-        if (!updated.target_date) {
-          ensureJobsForDate(updated, now.plus({ days: 1 }).toFormat('yyyy-MM-dd'));
+        ensureJobsForDate(updated, todayStr);
+        ensureJobsForDate(updated, tomorrowStr);
+        if (updated.start_date && updated.start_date > tomorrowStr) {
+          ensureJobsForDate(updated, updated.start_date);
         }
       }
     }

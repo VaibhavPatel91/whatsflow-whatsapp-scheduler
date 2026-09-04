@@ -35,24 +35,23 @@ export async function executeSendMessageJob(job: ScheduledJob): Promise<void> {
 
   // 3. Verify WhatsApp Connection State
   const session = WhatsAppSession.getInstance();
-  let authStatus = await session.checkAuthStatus();
+  let page = session.getPage();
 
-  if (authStatus !== 'CONNECTED') {
-    console.log(`[sendMessageJob] WhatsApp Web status is ${authStatus}. Attempting session initialization...`);
-    authStatus = await session.init();
+  if (!page || page.isClosed()) {
+    console.log('[sendMessageJob] Active browser page unavailable. Initializing session...');
+    await session.init();
+    page = session.getPage();
+  } else {
+    let authStatus = await session.checkAuthStatus();
+    if (authStatus !== 'CONNECTED') {
+      console.log(`[sendMessageJob] WhatsApp Web status is ${authStatus}. Re-initializing session...`);
+      await session.init();
+      page = session.getPage();
+    }
   }
 
-  if (authStatus !== 'CONNECTED') {
-    const errorMsg = `WhatsApp Web is not connected (Status: ${authStatus}). Job postponed/failed.`;
-    console.error(`[sendMessageJob] ${errorMsg}`);
-    jobRepository.updateStatus(job.id, 'FAILED', errorMsg);
-    return;
-  }
-
-
-  const page = session.getPage();
-  if (!page) {
-    const errorMsg = 'Playwright page object is unavailable.';
+  if (!page || page.isClosed()) {
+    const errorMsg = 'Playwright page object is unavailable after initialization attempt.';
     console.error(`[sendMessageJob] ${errorMsg}`);
     jobRepository.updateStatus(job.id, 'FAILED', errorMsg);
     return;
@@ -92,8 +91,7 @@ export async function executeSendMessageJob(job: ScheduledJob): Promise<void> {
     }
   }
 
-  // 7. Auto-close browser window post-dispatch
-  console.log('[sendMessageJob] Closing Chromium browser window post-dispatch...');
-  await session.closeBrowser();
+  // 7. Retain active browser window post-dispatch for seamless subsequent dispatches
+  console.log('[sendMessageJob] Post-dispatch complete. Retaining active Chromium browser window.');
 }
 

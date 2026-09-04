@@ -1,7 +1,7 @@
 import { chromium, BrowserContext, Page } from 'playwright';
 import path from 'path';
 import fs from 'fs';
-import { connectionRepository } from '../../../shared/src/db';
+import { connectionRepository, getProjectRoot } from '../../../shared/src/db';
 import { SELECTORS, findElementWithFallback } from './selectors';
 import { WhatsAppStatus } from '../../../shared/src/types';
 
@@ -42,10 +42,11 @@ export class WhatsAppSession {
 
       connectionRepository.updateStatus('CONNECTING');
 
-      const targetProfilePath = path.resolve(
-        process.cwd(),
-        profilePath || process.env.WHATSAPP_PROFILE_PATH || './data/whatsapp-profile'
-      );
+      const targetProfilePath = profilePath
+        ? path.resolve(getProjectRoot(), profilePath)
+        : process.env.WHATSAPP_PROFILE_PATH
+        ? path.resolve(getProjectRoot(), process.env.WHATSAPP_PROFILE_PATH)
+        : path.join(getProjectRoot(), 'data/whatsapp-profile');
 
       if (!fs.existsSync(targetProfilePath)) {
         fs.mkdirSync(targetProfilePath, { recursive: true });
@@ -116,8 +117,7 @@ export class WhatsAppSession {
     if (!this.page || this.page.isClosed()) {
       this.context = null;
       this.page = null;
-      const current = connectionRepository.get();
-      return current.status || 'DISCONNECTED';
+      return 'DISCONNECTED';
     }
 
     if (this.page.url() === 'about:blank' || this.page.url() === '') {
@@ -203,6 +203,10 @@ export class WhatsAppSession {
 
 
 
+
+  public getPage(): Page | null {
+    return this.page;
+  }
 
   public async getAvailableGroups(): Promise<Array<{ id: string; name: string }>> {
     if (!this.page || connectionRepository.get().status !== 'CONNECTED') {

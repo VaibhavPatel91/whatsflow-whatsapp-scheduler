@@ -23,7 +23,9 @@ export interface Schedule {
   first_send_time: string; // HH:mm
   gap_minutes: number;
   timezone: string;
-  target_date?: string; // YYYY-MM-DD
+  target_date?: string; // YYYY-MM-DD (legacy fallback)
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string; // YYYY-MM-DD
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -66,6 +68,8 @@ export interface CreateScheduleInput {
   gapMinutes?: number;
   timezone?: string;
   targetDate?: string;
+  startDate?: string;
+  endDate?: string;
   enabled?: boolean;
 }
 

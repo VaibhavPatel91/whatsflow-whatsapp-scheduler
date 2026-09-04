@@ -10,8 +10,8 @@ A modern, powerful, local open-source **WhatsApp Message Scheduler** built with 
 
 1. **Configure Your Message Task**:
    - Go to the **Schedule** page on the web dashboard.
-   - Type or select your target **WhatsApp Group Name** (e.g. `Friends`, `Office Team`, or `Family`).
-   - Write your message content, choose your **Schedule Date** and **Send Time** (e.g. `2026-09-05` at `10:00 AM`), and click **Save & Activate Task**.
+   - Type or select your target **WhatsApp Group Name** (e.g. `Finance`, `Office Team`, or `Family`).
+   - Write your message content, set your **Start Date** (defaults to today), optional **End Date** (for date range campaigns), and **Send Time** (e.g. `10:00 AM`), and click **Save & Activate Task**.
 
 2. **Local Database Storage**:
    - WhatsFlow saves your scheduled task safely in a local SQLite database (`database/sqlite.db`) on your computer.
@@ -36,15 +36,51 @@ A modern, powerful, local open-source **WhatsApp Message Scheduler** built with 
 
 ## ✨ Key Features (WhatsFlow)
 
+- **3 Flexible Scheduling Modes**:
+  - 📅 **Date Range Mode**: Schedule messages to dispatch daily between a **Start Date** and **End Date** at a given Send Time.
+  - 🎯 **Single Specific Date Mode**: Schedule a 1-time message for a specific date (defaulted to today's date) at a given Send Time.
+  - 🔄 **Daily Recurring Mode**: Schedule messages to repeat every day at a given Send Time.
+- **Dedicated Task Manager (`/schedules`)**: Interactive full-table page to search, filter by date/status, enable/disable, edit, or delete all created tasks.
+- **Today's Dispatch Timeline (Dashboard `/`)**: Live real-time execution monitor for today's dispatches with status pills (`Pending`, `Sending...`, `✓ Sent at HH:mm`, or `Failed`).
+- **Dispatch History & Audit Logs (`/history`)**: Searchable & filterable execution log recording run date, scheduled time, actual sent time, status, and error stack traces for all past and upcoming dispatches.
 - **Schedule WhatsApp Messages for Any Group**: Easily schedule messages for any personal or work WhatsApp group (e.g. `Finance`, `Office`, `Marketing`).
 - **Multi-Task & Multi-Group Scheduling**: Create, edit, toggle, and delete multiple independent scheduled messages for different WhatsApp groups concurrently.
-- **Specific Date & Send Time Selection**: Choose exact calendar dates (`YYYY-MM-DD`) and times (`HH:mm`) with timezone support (e.g. `Asia/Kolkata`, `UTC`, `EST`).
 - **Smart Group Autocomplete**: Direct text input with dynamic `<datalist>` suggestions populated from your saved schedules and detected groups.
 - **Auto-Close Browser Engine**: Chromium only opens when a message dispatch is due and automatically closes immediately after sending to keep system memory light.
 - **Header Safety Title Verification**: Playwright strictly checks the open chat header title (`#main header`) before typing to ensure 100% accurate recipient verification.
 - **Idempotency & Duplicate Prevention**: Unique idempotency keys prevent messages from ever being sent twice, even if the worker process restarts.
-- **Live 2-Column Dashboard**: High-contrast modern UI featuring live **WhatsApp Web State** monitoring, **System Web State** (network online/offline check), active daily schedules, and today's dispatch timeline.
+- **Live 2-Column Dashboard**: High-contrast modern UI featuring live **WhatsApp Web State** monitoring (with collapsible Playwright log trace), **System Web State** (network online/offline check), today's active schedules, and today's dispatch timeline.
 - **100% Private Local Session Storage**: Your WhatsApp login session stays encrypted locally in `worker/data/whatsapp-profile/`. No data or tokens are ever sent to remote servers.
+
+---
+
+## 🗺️ Application Navigation & Pages Guide
+
+WhatsFlow features 5 dedicated web pages for managing your WhatsApp automation studio:
+
+1. 🏠 **Dashboard (`/`)**:
+   - **WhatsApp Web State**: Live connection monitoring with interactive **"Verify Live Session in Browser"** button and expandable technical log trace for Chromium errors.
+   - **System Web State**: Real-time network connectivity detector.
+   - **Today's Active Schedules**: Displays tasks scheduled to perform **today** (whether enabled or disabled), automatically excluding completed or non-today tasks.
+   - **Today's Dispatch Timeline**: Live execution timeline showing sequence numbers (`#1`), scheduled times, and real-time status pills (`Pending`, `Sending...`, `✓ Sent at HH:mm`, `Failed`).
+
+2. ➕ **Schedule New Task / Edit (`/schedule`)**:
+   - Form to create or update message schedules with WhatsApp group autocomplete.
+   - Configures **Start Date** (required, defaulted to today), optional **End Date** (for date range campaigns), **Send Time**, and **Timezone**.
+   - Features a real-time **Scheduling Mode Banner** (📅 Date Range, 🎯 Single Date, 🔄 Daily Recurring).
+
+3. 📋 **All Tasks Manager (`/schedules`)**:
+   - Complete interactive data table listing all created task configurations.
+   - Features search bar, **Filter Date** selector, status filter tabs (`All`, `Active`, `Disabled`, `Completed`), inline **Enable/Disable** toggles, **Edit**, and **Delete** buttons.
+
+4. 📜 **Dispatch History & Audit Logs (`/history`)**:
+   - Comprehensive audit table tracking all past and upcoming execution jobs.
+   - Displays run date (`YYYY-MM-DD`), message number, scheduled timestamp, actual sent timestamp, idempotency key, and failure error trace.
+
+5. ⚙️ **System Settings & Session Control (`/settings`)**:
+   - Inspects Playwright Chromium persistent profile path (`./data/whatsapp-profile`).
+   - Manual **Disconnect Session** control button.
+   - Safety, privacy, and WhatsApp Terms compliance guidelines.
 
 ---
 

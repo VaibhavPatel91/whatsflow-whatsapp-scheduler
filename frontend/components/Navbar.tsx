@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Calendar, History, Settings, ShieldAlert } from 'lucide-react';
+import { MessageSquare, Calendar, History, Settings, ListFilter } from 'lucide-react';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -10,6 +10,7 @@ export function Navbar() {
   const navItems = [
     { name: 'Dashboard', href: '/', icon: MessageSquare },
     { name: 'Schedule', href: '/schedule', icon: Calendar },
+    { name: 'All Tasks', href: '/schedules', icon: ListFilter },
     { name: 'History', href: '/history', icon: History },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

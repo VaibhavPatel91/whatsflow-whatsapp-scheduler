@@ -3,7 +3,18 @@ import path from 'path';
 import fs from 'fs';
 import { Schedule, ScheduledJob, WhatsAppConnectionRecord, WhatsAppStatus, JobStatus } from './types';
 
-const dbDir = path.resolve(__dirname, '../../database');
+export function getProjectRoot(): string {
+  let current = __dirname;
+  while (current !== path.parse(current).root) {
+    if (fs.existsSync(path.join(current, 'database', 'schema.sql'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return process.cwd();
+}
+
+const dbDir = process.env.DB_DIR || path.join(getProjectRoot(), 'database');
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
@@ -63,12 +74,10 @@ export function getDb() {
   return db;
 }
 
-// Ensure target_date column exists
-try {
-  db.exec("ALTER TABLE schedules ADD COLUMN target_date TEXT;");
-} catch {
-  // column already exists
-}
+// Ensure columns exist
+try { db.exec("ALTER TABLE schedules ADD COLUMN target_date TEXT;"); } catch {}
+try { db.exec("ALTER TABLE schedules ADD COLUMN start_date TEXT;"); } catch {}
+try { db.exec("ALTER TABLE schedules ADD COLUMN end_date TEXT;"); } catch {}
 
 // Schedules Repository
 export const scheduleRepository = {
@@ -85,8 +94,8 @@ export const scheduleRepository = {
 
   create(schedule: Omit<Schedule, 'created_at' | 'updated_at'>): Schedule {
     const stmt = db.prepare(`
-      INSERT INTO schedules (id, group_id, group_name, message_1, message_2, first_send_time, gap_minutes, timezone, target_date, enabled, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      INSERT INTO schedules (id, group_id, group_name, message_1, message_2, first_send_time, gap_minutes, timezone, target_date, start_date, end_date, enabled, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `);
     stmt.run(
       schedule.id,
@@ -98,6 +107,8 @@ export const scheduleRepository = {
       schedule.gap_minutes,
       schedule.timezone,
       schedule.target_date || null,
+      schedule.start_date || null,
+      schedule.end_date || null,
       schedule.enabled ? 1 : 0
     );
     return this.getById(schedule.id)!;
@@ -118,6 +129,8 @@ export const scheduleRepository = {
     if (updates.gap_minutes !== undefined) { fields.push('gap_minutes = ?'); values.push(updates.gap_minutes); }
     if (updates.timezone !== undefined) { fields.push('timezone = ?'); values.push(updates.timezone); }
     if (updates.target_date !== undefined) { fields.push('target_date = ?'); values.push(updates.target_date); }
+    if (updates.start_date !== undefined) { fields.push('start_date = ?'); values.push(updates.start_date); }
+    if (updates.end_date !== undefined) { fields.push('end_date = ?'); values.push(updates.end_date); }
     if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
 
     if (fields.length === 0) return current;
@@ -241,4 +254,10 @@ export const connectionRepository = {
     return this.get();
   }
 };
+
+export function resetDatabase(): void {
+  db.prepare('DELETE FROM scheduled_jobs').run();
+  db.prepare('DELETE FROM schedules').run();
+  db.prepare("UPDATE whatsapp_connection SET status = 'DISCONNECTED', last_error = NULL WHERE id = 'default'").run();
+}
 

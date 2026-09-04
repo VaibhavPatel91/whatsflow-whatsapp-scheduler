@@ -47,9 +47,9 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
 
     if (dueJobs.length > 0) {
       // Auto-recover session ONLY when there are actual jobs due now
-      const connection = connectionRepository.get();
-      if (connection.status === 'DISCONNECTED' || connection.status === 'CONNECTING') {
-        const session = WhatsAppSession.getInstance();
+      const session = WhatsAppSession.getInstance();
+      if (!session.getPage() || session.getPage()?.isClosed()) {
+        console.log('[Scheduler] Pending job due and session page inactive. Initializing session...');
         await session.init().catch(() => {});
       }
 

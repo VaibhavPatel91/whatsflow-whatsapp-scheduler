@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import moment from 'moment';
 import { History, RefreshCw, CheckCircle2, AlertCircle, Clock, Search } from 'lucide-react';
 
 interface ScheduledJob {
@@ -111,14 +112,14 @@ export default function HistoryPage() {
               <tbody className="divide-y divide-slate-800/60">
                 {filteredJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-6 py-4 font-medium text-slate-200">{job.run_date}</td>
+                    <td className="px-6 py-4 font-medium text-slate-200">{moment(job.run_date).format('DD-MM-YYYY')}</td>
                     <td className="px-6 py-4 font-bold text-emerald-400">Message #{job.message_number}</td>
                     <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                      {new Date(job.scheduled_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                      {moment(job.scheduled_at).format('DD-MM-YYYY, hh:mm A')}
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(job.status)}</td>
                     <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                      {job.sent_at ? new Date(job.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {job.sent_at ? moment(job.sent_at).format('DD-MM-YYYY, hh:mm A') : '-'}
                     </td>
                     <td className="px-6 py-4 text-xs text-red-400 truncate max-w-xs" title={job.error_message || ''}>
                       {job.error_message || '-'}

@@ -26,10 +26,40 @@ export function calculateJobTimes(
 
 /**
  * Generates structured idempotency key for a job.
- * Format: {scheduleId}_{YYYY-MM-DD}_{messageNumber}
+ * Format: {scheduleId}_{YYYY-MM-DD}_{HHmm}_{messageNumber}
  */
-export function generateIdempotencyKey(scheduleId: string, runDateStr: string, messageNumber: number): string {
+export function generateIdempotencyKey(scheduleId: string, runDateStr: string, messageNumber: number, firstSendTimeStr?: string): string {
+  if (firstSendTimeStr) {
+    const cleanTime = firstSendTimeStr.replace(':', '');
+    return `${scheduleId}_${runDateStr}_${cleanTime}_${messageNumber}`;
+  }
   return `${scheduleId}_${runDateStr}_${messageNumber}`;
+}
+
+/**
+ * Evaluates whether a schedule is active on a given target date (YYYY-MM-DD)
+ * based on the 3 scheduling modes:
+ * 1. Date Range: start_date && end_date -> targetDateStr >= start_date && targetDateStr <= end_date
+ * 2. Single Specific Date: start_date && !end_date -> targetDateStr === start_date
+ * 3. Daily Recurring: !start_date && !end_date -> active every day
+ */
+export function isScheduleActiveOnDate(schedule: Schedule, targetDateStr: string): boolean {
+  const startDate = schedule.start_date || schedule.target_date;
+  const endDate = schedule.end_date;
+
+  if (startDate && endDate) {
+    return targetDateStr >= startDate && targetDateStr <= endDate;
+  }
+
+  if (startDate && !endDate) {
+    return targetDateStr === startDate;
+  }
+
+  if (!startDate && !endDate) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -38,6 +68,7 @@ export function generateIdempotencyKey(scheduleId: string, runDateStr: string, m
  */
 export function ensureJobsForDate(schedule: Schedule, targetDateStr: string): ScheduledJob[] {
   if (!schedule.enabled) return [];
+  if (!isScheduleActiveOnDate(schedule, targetDateStr)) return [];
 
   const [hours, minutes] = schedule.first_send_time.split(':').map(Number);
   const message1Time = DateTime.fromISO(`${targetDateStr}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`, { zone: schedule.timezone });
@@ -50,10 +81,22 @@ export function ensureJobsForDate(schedule: Schedule, targetDateStr: string): Sc
 
   const createdJobs: ScheduledJob[] = [];
 
-
   // Single Job per day (Message 1)
-  const key1 = generateIdempotencyKey(schedule.id, targetDateStr, 1);
+  const key1 = generateIdempotencyKey(schedule.id, targetDateStr, 1, schedule.first_send_time);
   let existing1 = jobRepository.getByIdempotencyKey(key1);
+
+  // Fallback check for legacy idempotency keys formatted without time: {scheduleId}_{runDate}_1
+  if (!existing1) {
+    const legacyKey = `${schedule.id}_${targetDateStr}_1`;
+    const legacyJob = jobRepository.getByIdempotencyKey(legacyKey);
+    if (legacyJob) {
+      const targetIso1 = message1Time.toUTC().toISO();
+      // If legacy job matches the exact new scheduled time, treat as existing
+      if (legacyJob.scheduled_at === targetIso1) {
+        existing1 = legacyJob;
+      }
+    }
+  }
 
   if (existing1 && (existing1.status === 'CANCELLED' || existing1.status === 'FAILED')) {
     jobRepository.delete(existing1.id);

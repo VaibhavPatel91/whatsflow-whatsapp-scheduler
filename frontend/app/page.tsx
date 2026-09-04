@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import moment from 'moment';
 import { 
   CheckCircle2, 
   Clock, 
@@ -18,7 +19,9 @@ import {
   Trash2,
   Edit3,
   Globe,
-  Wifi
+  Wifi,
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 interface WAConnection {
@@ -37,6 +40,8 @@ interface Schedule {
   enabled: boolean;
   timezone?: string;
   target_date?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 interface ScheduledJob {
@@ -118,18 +123,54 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeleteSchedule = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
+  const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDeleteSchedule = async () => {
+    if (!scheduleToDelete) return;
     try {
-      await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+      setDeleting(true);
+      await fetch(`/api/schedules/${scheduleToDelete.id}`, { method: 'DELETE' });
+      setScheduleToDelete(null);
       await fetchData();
     } catch (err) {
       console.error('Error deleting schedule:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const getTodayLocal = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getTodayLocal();
   const todaysJobs = jobs.filter(j => j.scheduled_at.startsWith(todayStr));
+
+  // Filter schedules that are active TODAY (whether enabled or disabled), excluding completed single-date tasks
+  const schedulesToday = schedules.filter(s => {
+    const startDate = s.start_date || s.target_date;
+    const endDate = s.end_date;
+
+    // Date Range Mode: Active if today is within [start_date, end_date]
+    if (startDate && endDate) {
+      if (todayStr < startDate || todayStr > endDate) return false;
+    }
+
+    // Single Specific Date Mode: Active ONLY if start_date === today AND not already completed
+    if (startDate && !endDate) {
+      if (todayStr !== startDate) return false;
+      const sentJob = jobs.find(j => j.schedule_id === s.id && j.status === 'SENT');
+      if (sentJob) return false; // Exclude completed 1-time tasks!
+    }
+
+    // Daily Recurring Mode: Active every day
+    return true;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -169,10 +210,10 @@ export default function Dashboard() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       {/* LEFT SIDE: WhatsApp Web State & System Web State */}
-      <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-8">
+      <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-8 min-w-0 max-w-full">
         
         {/* CARD 1: WhatsApp Web State */}
-        <div className="bg-slate-900/60 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl space-y-5">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl space-y-5 min-w-0 max-w-full overflow-hidden">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
             <div className="flex items-center space-x-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
@@ -196,14 +237,34 @@ export default function Dashboard() {
 
             {/* Error / Disconnected Alert Banner */}
             {(waStatus.status === 'DISCONNECTED' || waStatus.status === 'ERROR') && (
-              <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl space-y-1.5 text-xs text-red-400">
+              <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl space-y-2 text-xs text-red-400 max-w-full overflow-hidden">
                 <div className="font-bold flex items-center space-x-1.5 text-red-300">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>WhatsApp Session Disconnected</span>
+                  <span>
+                    {waStatus.lastError?.includes('Opening in existing browser session') || waStatus.lastError?.includes('already in use')
+                      ? 'Chromium Profile Busy'
+                      : 'WhatsApp Session Offline'}
+                  </span>
                 </div>
-                <p className="text-[11px] text-red-400/90 leading-relaxed">
-                  {waStatus.lastError || 'Playwright session is offline. The worker cannot send automated messages until WhatsApp is connected.'}
+                
+                <p className="text-[11px] text-red-300/90 leading-relaxed break-words">
+                  {waStatus.lastError?.includes('Opening in existing browser session') || waStatus.lastError?.includes('already in use')
+                    ? 'The Chromium browser profile is locked by another running process. Please close any open Chrome/Chromium windows or wait a moment.'
+                    : waStatus.lastError || 'Playwright session is offline. The worker cannot send automated messages until WhatsApp is connected.'}
                 </p>
+
+                {waStatus.lastError && (
+                  <div className="pt-1">
+                    <details className="group">
+                      <summary className="cursor-pointer text-[10px] font-semibold text-red-400/80 hover:text-red-300 transition select-none flex items-center space-x-1">
+                        <span>View Technical Error Trace</span>
+                      </summary>
+                      <div className="mt-2 bg-slate-950/80 p-2.5 rounded-lg border border-red-500/20 max-h-32 overflow-y-auto overflow-x-hidden text-[10px] font-mono text-red-400/80 leading-normal break-all whitespace-pre-wrap">
+                        {waStatus.lastError}
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
             )}
 
@@ -248,7 +309,7 @@ export default function Dashboard() {
         </div>
 
         {/* CARD 2: System Web State */}
-        <div className="bg-slate-900/60 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4 min-w-0 max-w-full overflow-hidden">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div className="flex items-center space-x-2">
               <Globe className="w-5 h-5 text-blue-400" />
@@ -288,28 +349,37 @@ export default function Dashboard() {
       {/* RIGHT SIDE: Active Daily Schedules (UP) & Today's Dispatch Timeline (DOWN) */}
       <div className="lg:col-span-2 space-y-8">
         
-        {/* UP: Active Daily Schedules Section */}
+        {/* UP: Today's Active Schedules Section */}
         <div className="bg-slate-900/60 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
             <div className="flex items-center space-x-2.5">
               <Calendar className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-slate-100">Active Daily Schedules</h2>
+              <h2 className="text-lg font-bold text-slate-100">Today&apos;s Active Schedules</h2>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {schedules.length}
+                {schedulesToday.length}
               </span>
             </div>
-            <Link
-              href="/schedule"
-              className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Add New Schedule</span>
-            </Link>
+            <div className="flex items-center space-x-3">
+              <Link
+                href="/schedules"
+                className="text-xs font-semibold text-emerald-400 hover:underline flex items-center space-x-1"
+              >
+                <span>View All Tasks ({schedules.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/schedule"
+                className="inline-flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Add Schedule</span>
+              </Link>
+            </div>
           </div>
 
-          {schedules.length > 0 ? (
+          {schedulesToday.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {schedules.map((schedule) => (
+              {schedulesToday.map((schedule) => (
                 <div 
                   key={schedule.id} 
                   className="bg-slate-950/70 p-5 rounded-2xl border border-slate-800/80 hover:border-slate-700 transition flex flex-col justify-between space-y-4"
@@ -340,7 +410,19 @@ export default function Dashboard() {
                     <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80 space-y-1.5">
                       <div className="text-xs font-semibold text-slate-400 flex items-center space-x-1.5">
                         <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Date: <strong className="text-emerald-300 font-bold">{schedule.target_date || 'Daily'}</strong> at <strong className="text-emerald-300 font-bold">{schedule.first_send_time}</strong> ({schedule.timezone || 'Asia/Kolkata'})</span>
+                        <span>
+                          Date:{' '}
+                          <strong className="text-emerald-300 font-bold">
+                            {schedule.start_date && schedule.end_date
+                              ? `${moment(schedule.start_date).format('DD-MM-YYYY')} to ${moment(schedule.end_date).format('DD-MM-YYYY')}`
+                              : schedule.start_date
+                              ? moment(schedule.start_date).format('DD-MM-YYYY')
+                              : schedule.target_date
+                              ? moment(schedule.target_date).format('DD-MM-YYYY')
+                              : 'Daily'}
+                          </strong>{' '}
+                          at <strong className="text-emerald-300 font-bold">{schedule.first_send_time}</strong> ({schedule.timezone || 'Asia/Kolkata'})
+                        </span>
                       </div>
                       <p className="text-xs text-slate-300 italic line-clamp-3 leading-relaxed">&ldquo;{schedule.message_1}&rdquo;</p>
                     </div>
@@ -349,7 +431,7 @@ export default function Dashboard() {
 
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
                     <button
-                      onClick={() => handleDeleteSchedule(schedule.id)}
+                      onClick={() => setScheduleToDelete(schedule)}
                       className="text-red-400 hover:text-red-300 font-medium flex items-center space-x-1 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -371,16 +453,24 @@ export default function Dashboard() {
               <div className="p-4 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-3">
                 <Calendar className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-slate-200">No Active Schedules</h3>
+              <h3 className="text-base font-bold text-slate-200">No Active Schedules for Today</h3>
               <p className="text-xs text-slate-400 max-w-sm mt-1 mb-5">
-                Set up a daily automated message schedule specifying your target WhatsApp group, message content, and send time.
+                There are no message tasks scheduled to run today. You can view all created tasks or set up a new schedule.
               </p>
-              <Link
-                href="/schedule"
-                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
-              >
-                Create First Schedule
-              </Link>
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/schedules"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700"
+                >
+                  View All Tasks ({schedules.length})
+                </Link>
+                <Link
+                  href="/schedule"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20"
+                >
+                  Add New Schedule
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -414,7 +504,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-xs text-slate-400 flex items-center space-x-1 mt-0.5">
                         <Clock className="w-3 h-3 text-slate-500" />
-                        <span>Scheduled: {new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>Scheduled: {moment(job.scheduled_at).format('DD-MM-YYYY, hh:mm A')}</span>
                       </div>
                     </div>
                   </div>
@@ -422,7 +512,7 @@ export default function Dashboard() {
                   <div>
                     {job.status === 'SENT' && (
                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        ✓ Sent {job.sent_at ? `at ${new Date(job.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                        ✓ Sent {job.sent_at ? `at ${moment(job.sent_at).format('DD-MM-YYYY, hh:mm A')}` : ''}
                       </span>
                     )}
                     {job.status === 'PENDING' && (
@@ -451,6 +541,69 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {scheduleToDelete && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-2xl max-w-md w-full shadow-2xl space-y-5 relative animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setScheduleToDelete(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+              disabled={deleting}
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto shadow-lg shadow-red-500/10">
+                <Trash2 className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-100">
+                Delete Schedule Task?
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Are you sure you want to delete the schedule for <strong className="text-slate-200">{scheduleToDelete.group_name}</strong>?
+              </p>
+              <div className="text-xs text-red-400 bg-red-500/10 p-3 rounded-xl border border-red-500/20 text-left space-y-1">
+                <div className="font-bold flex items-center space-x-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Warning: This action cannot be undone.</span>
+                </div>
+                <p className="text-[11px] text-red-300/80 pl-4">
+                  This will remove the schedule configuration and cancel all future pending dispatches.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                onClick={() => setScheduleToDelete(null)}
+                disabled={deleting}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSchedule}
+                disabled={deleting}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition flex items-center justify-center space-x-2 shadow-lg shadow-red-600/20 disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete Task</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight } from 'lucide-react';
+import moment from 'moment';
+import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight, Target, Repeat } from 'lucide-react';
 
 function ScheduleForm() {
   const router = useRouter();
@@ -12,10 +13,19 @@ function ScheduleForm() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [existingScheduleId, setExistingScheduleId] = useState<string | null>(null);
 
+  const getTodayLocal = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Form State
   const [groupName, setGroupName] = useState('');
   const [message1, setMessage1] = useState('Good morning everyone!');
-  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(getTodayLocal);
+  const [endDate, setEndDate] = useState('');
   const [firstSendTime, setFirstSendTime] = useState('10:00');
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [enabled, setEnabled] = useState(true);
@@ -51,7 +61,8 @@ function ScheduleForm() {
             setExistingScheduleId(s.id);
             setGroupName(s.group_name);
             setMessage1(s.message_1);
-            if (s.target_date) setTargetDate(s.target_date);
+            setStartDate(s.start_date || s.target_date || getTodayLocal());
+            setEndDate(s.end_date || '');
             setFirstSendTime(s.first_send_time);
             setTimezone(s.timezone || 'Asia/Kolkata');
             setEnabled(s.enabled);
@@ -87,7 +98,9 @@ function ScheduleForm() {
         firstSendTime,
         gapMinutes: 0,
         timezone,
-        targetDate,
+        startDate: startDate || '',
+        endDate: endDate || '',
+        targetDate: startDate || '',
         enabled
       };
 
@@ -128,7 +141,7 @@ function ScheduleForm() {
           <span>{existingScheduleId ? 'Edit Scheduled Task' : 'Schedule New Task'}</span>
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Configure an automated WhatsApp message task for a specific date and time.
+          Configure an automated WhatsApp message task for a daily schedule, date range, or specific single date.
         </p>
       </div>
 
@@ -140,7 +153,7 @@ function ScheduleForm() {
       )}
 
       {errorMessage && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-sm">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-sm break-words max-w-full overflow-hidden">
           {errorMessage}
         </div>
       )}
@@ -159,23 +172,22 @@ function ScheduleForm() {
             onChange={(e) => setGroupName(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
             required
-            autoComplete="off"
           />
           <datalist id="group-suggestions">
-            {suggestions.map((name) => (
-              <option key={name} value={name} />
+            {suggestions.map((name, idx) => (
+              <option key={idx} value={name} />
             ))}
           </datalist>
-          <p className="text-xs text-slate-500 mt-1.5">
-            Select a previously created group or type any new WhatsApp group name.
+          <p className="text-xs text-slate-400 mt-1.5">
+            Tip: Must match the exact name of the group in your WhatsApp Web.
           </p>
         </div>
 
-        {/* Message Input */}
+        {/* Message Content Input */}
         <div>
-          <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
-            <MessageSquare className="w-4 h-4 text-emerald-400" />
+          <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
             <span>Message Content *</span>
+            <span className="text-xs text-slate-400 font-normal">Supports Emojis &amp; Formatting</span>
           </label>
           <textarea
             rows={4}
@@ -187,51 +199,122 @@ function ScheduleForm() {
           />
         </div>
 
-        {/* Schedule Date, Send Time & Timezone */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
-              <Calendar className="w-4 h-4 text-emerald-400" />
-              <span>Schedule Date *</span>
-            </label>
-            <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-              required
-            />
+        {/* Schedule Controls: Start Date, End Date, Send Time & Timezone */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Start Schedule Date */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Start Date *</span>
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                required
+              />
+            </div>
+
+            {/* End Schedule Date */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-200 flex items-center space-x-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>End Date <span className="text-slate-500 font-normal">(Optional)</span></span>
+                </label>
+                {endDate && (
+                  <button
+                    type="button"
+                    onClick={() => setEndDate('')}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 underline font-medium"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+              />
+            </div>
+
+            {/* Send Time */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
+                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Send Time *</span>
+              </label>
+              <input
+                type="time"
+                value={firstSendTime}
+                onChange={(e) => setFirstSendTime(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                required
+              />
+            </div>
+
+            {/* Timezone */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Timezone</span>
+              </label>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+              >
+                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">America/New_York (EST)</option>
+                <option value="Europe/London">Europe/London (GMT)</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
-              <Clock className="w-4 h-4 text-emerald-400" />
-              <span>Send Time *</span>
-            </label>
-            <input
-              type="time"
-              value={firstSendTime}
-              onChange={(e) => setFirstSendTime(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-200 mb-2 flex items-center space-x-1.5">
-              <Globe className="w-4 h-4 text-emerald-400" />
-              <span>Timezone</span>
-            </label>
-            <select
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
-            >
-              <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">America/New_York (EST)</option>
-              <option value="Europe/London">Europe/London (GMT)</option>
-            </select>
+          {/* Real-Time Scheduling Mode Banner */}
+          <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80 text-xs flex items-center space-x-3">
+            {startDate && endDate ? (
+              <>
+                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0 flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div className="leading-relaxed">
+                  <span className="font-bold text-blue-300">Date Range Mode:</span>
+                  <span className="text-slate-300 ml-1.5">
+                    Message will dispatch daily between <strong className="text-emerald-400">{moment(startDate).format('DD-MM-YYYY')}</strong> and <strong className="text-emerald-400">{moment(endDate).format('DD-MM-YYYY')}</strong> at <strong className="text-emerald-400">{firstSendTime}</strong>.
+                  </span>
+                </div>
+              </>
+            ) : startDate && !endDate ? (
+              <>
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 flex items-center justify-center">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div className="leading-relaxed">
+                  <span className="font-bold text-emerald-300">Single Specific Date Mode:</span>
+                  <span className="text-slate-300 ml-1.5">
+                    Message will dispatch 1-time on <strong className="text-emerald-400">{moment(startDate).format('DD-MM-YYYY')}</strong> at <strong className="text-emerald-400">{firstSendTime}</strong>.
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0 flex items-center justify-center">
+                  <Repeat className="w-4 h-4" />
+                </div>
+                <div className="leading-relaxed">
+                  <span className="font-bold text-amber-300">Daily Recurring Mode:</span>
+                  <span className="text-slate-300 ml-1.5">
+                    Message will dispatch every day at <strong className="text-emerald-400">{firstSendTime}</strong>.
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
