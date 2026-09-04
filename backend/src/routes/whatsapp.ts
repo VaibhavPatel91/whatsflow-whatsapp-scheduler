@@ -17,10 +17,8 @@ whatsappRouter.get('/status', (req: Request, res: Response) => {
 // POST /api/whatsapp/connect
 whatsappRouter.post('/connect', async (req: Request, res: Response) => {
   try {
-    const { WhatsAppSession } = require('../../../worker/src/whatsapp/session');
-    const session = WhatsAppSession.getInstance();
-    const status = await session.init();
-    res.json({ message: 'WhatsApp session verified', status });
+    const connection = connectionRepository.get();
+    res.json({ message: 'WhatsApp session status verified', status: connection.status });
   } catch (err: any) {
     res.status(500).json({ error: err.message || String(err) });
   }

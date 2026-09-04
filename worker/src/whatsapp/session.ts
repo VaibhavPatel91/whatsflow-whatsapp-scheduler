@@ -101,8 +101,18 @@ export class WhatsAppSession {
       this.page = whatsappPage;
       await this.page.bringToFront().catch(() => {});
 
-      // Check authentication status
-      const status = await this.checkAuthStatus();
+      // Check authentication status with polling loop (up to 20s) for initial page load
+      let status: WhatsAppStatus = 'CONNECTING';
+      const maxRetries = 10;
+      for (let i = 0; i < maxRetries; i++) {
+        status = await this.checkAuthStatus();
+        if (status === 'CONNECTED' || status === 'WAITING_FOR_QR') {
+          break;
+        }
+        if (i < maxRetries - 1) {
+          await this.page.waitForTimeout(2000).catch(() => {});
+        }
+      }
       this.isInitializing = false;
       return status;
     } catch (err: any) {

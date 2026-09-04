@@ -38,6 +38,12 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
   isProcessingQueue = true;
 
   try {
+    // 0. Verify live WhatsApp auth status if session is active
+    const session = WhatsAppSession.getInstance();
+    if (session.getPage() && !session.getPage()?.isClosed()) {
+      await session.checkAuthStatus().catch(() => {});
+    }
+
     // 1. Sync upcoming jobs for enabled schedules
     syncPendingJobsForActiveSchedules();
 

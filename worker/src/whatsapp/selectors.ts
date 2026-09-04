@@ -7,14 +7,22 @@ export const SELECTORS = {
   // Main chat list & loading states
   sideBar: [
     '#side',
+    '#pane-side',
+    'div[id="side"]',
+    'div[id="pane-side"]',
     'div[data-testid="chat-list-sidebar"]',
-    'div[aria-label="Chat list"]'
+    'div[aria-label="Chat list"]',
+    'header[data-testid="chatlist-header"]',
+    '#app header',
+    'div[contenteditable="true"][data-tab="3"]',
+    'div[aria-label="Search or start new chat"]'
   ],
   qrContainer: [
     'div[data-ref]',
     'canvas',
     'div[data-testid="qrcode"]',
-    'div[aria-label="Scan this QR code to use WhatsApp Web"]'
+    'div[aria-label="Scan this QR code to use WhatsApp Web"]',
+    'div[data-testid="qr-code"]'
   ],
 
   // Search Box
