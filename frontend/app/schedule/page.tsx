@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import moment from 'moment';
 import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight, Target, Repeat } from 'lucide-react';
+import { ScheduleFormSkeleton } from '@/components/skeletons';
 
 function ScheduleForm() {
   const router = useRouter();
@@ -30,6 +31,7 @@ function ScheduleForm() {
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [enabled, setEnabled] = useState(true);
 
+  const [initializing, setInitializing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -37,6 +39,7 @@ function ScheduleForm() {
   useEffect(() => {
     const init = async () => {
       try {
+        setInitializing(true);
         const [resGroups, resSchedules] = await Promise.all([
           fetch('/api/whatsapp/groups').then(r => r.json()).catch(() => []),
           fetch('/api/schedules').then(r => r.json()).catch(() => [])
@@ -70,11 +73,17 @@ function ScheduleForm() {
         }
       } catch (err) {
         console.error('Error initializing schedule form:', err);
+      } finally {
+        setInitializing(false);
       }
     };
 
     init();
   }, [scheduleIdParam]);
+
+  if (initializing) {
+    return <ScheduleFormSkeleton />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,7 +360,7 @@ function ScheduleForm() {
 
 export default function SchedulePage() {
   return (
-    <Suspense fallback={<div className="text-center text-slate-400 py-10">Loading schedule configuration...</div>}>
+    <Suspense fallback={<ScheduleFormSkeleton />}>
       <ScheduleForm />
     </Suspense>
   );

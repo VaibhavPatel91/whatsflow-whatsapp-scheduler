@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
+import { SchedulesTableSkeleton } from '@/components/skeletons';
 
 interface Schedule {
   id: string;
@@ -280,8 +281,11 @@ export default function AllSchedulesPage() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
-        {filteredSchedules.length > 0 ? (
+      {loading ? (
+        <SchedulesTableSkeleton />
+      ) : (
+        <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
+          {filteredSchedules.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-300">
               <thead className="bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
@@ -399,6 +403,7 @@ export default function AllSchedulesPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {scheduleToDelete && (

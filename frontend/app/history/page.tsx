@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import moment from 'moment';
 import { History, RefreshCw, CheckCircle2, AlertCircle, Clock, Search } from 'lucide-react';
+import { HistoryTableSkeleton } from '@/components/skeletons';
 
 interface ScheduledJob {
   id: string;
@@ -95,46 +96,50 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
-        {filteredJobs.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
-                <tr>
-                  <th className="px-6 py-4">Run Date</th>
-                  <th className="px-6 py-4">Message #</th>
-                  <th className="px-6 py-4">Scheduled Time</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Sent Time</th>
-                  <th className="px-6 py-4">Error / Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-6 py-4 font-medium text-slate-200">{moment(job.run_date).format('DD-MM-YYYY')}</td>
-                    <td className="px-6 py-4 font-bold text-emerald-400">Message #{job.message_number}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                      {moment(job.scheduled_at).format('DD-MM-YYYY, hh:mm A')}
-                    </td>
-                    <td className="px-6 py-4">{getStatusBadge(job.status)}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                      {job.sent_at ? moment(job.sent_at).format('DD-MM-YYYY, hh:mm A') : '-'}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-red-400 truncate max-w-xs" title={job.error_message || ''}>
-                      {job.error_message || '-'}
-                    </td>
+      {loading ? (
+        <HistoryTableSkeleton />
+      ) : (
+        <div className="bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden">
+          {filteredJobs.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950/80 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="px-6 py-4">Run Date</th>
+                    <th className="px-6 py-4">Message #</th>
+                    <th className="px-6 py-4">Scheduled Time</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Sent Time</th>
+                    <th className="px-6 py-4">Error / Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="py-12 text-center text-sm text-slate-500">
-            No message dispatch logs matching your filter criteria.
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredJobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-slate-800/30 transition">
+                      <td className="px-6 py-4 font-medium text-slate-200">{moment(job.run_date).format('DD-MM-YYYY')}</td>
+                      <td className="px-6 py-4 font-bold text-emerald-400">Message #{job.message_number}</td>
+                      <td className="px-6 py-4 text-xs font-mono text-slate-400">
+                        {moment(job.scheduled_at).format('DD-MM-YYYY, hh:mm A')}
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(job.status)}</td>
+                      <td className="px-6 py-4 text-xs font-mono text-slate-400">
+                        {job.sent_at ? moment(job.sent_at).format('DD-MM-YYYY, hh:mm A') : '-'}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-red-400 truncate max-w-xs" title={job.error_message || ''}>
+                        {job.error_message || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-sm text-slate-500">
+              No message dispatch logs matching your filter criteria.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
