@@ -77,9 +77,9 @@ export default function Dashboard() {
     };
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const [resStatus, resSchedules, resJobs] = await Promise.all([
         fetch('/api/whatsapp/status').then(r => r.json()),
         fetch('/api/schedules').then(r => r.json()),
@@ -92,13 +92,13 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -222,7 +222,7 @@ export default function Dashboard() {
                   <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">WhatsApp Web State</h2>
                 </div>
                 <button
-                  onClick={fetchData}
+                  onClick={() => fetchData(false)}
                   disabled={loading}
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition border border-slate-700"
                   title="Refresh Status"

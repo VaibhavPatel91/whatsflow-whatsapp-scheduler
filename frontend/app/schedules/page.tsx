@@ -64,9 +64,9 @@ export default function AllSchedulesPage() {
     return `${year}-${month}-${day}`;
   };
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const [resSchedules, resJobs] = await Promise.all([
         fetch('/api/schedules').then(r => r.json()).catch(() => []),
         fetch('/api/jobs?limit=200').then(r => r.json()).catch(() => [])
@@ -76,19 +76,19 @@ export default function AllSchedulesPage() {
     } catch (err) {
       console.error('Error fetching schedules:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
   }, []);
 
   const handleToggleSchedule = async (schedule: Schedule) => {
     try {
       const endpoint = schedule.enabled ? `/api/schedules/${schedule.id}/disable` : `/api/schedules/${schedule.id}/enable`;
       await fetch(endpoint, { method: 'POST' });
-      await fetchData();
+      await fetchData(false);
     } catch (err) {
       console.error('Error toggling schedule:', err);
     }
