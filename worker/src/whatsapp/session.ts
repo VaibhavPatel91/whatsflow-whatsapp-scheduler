@@ -52,15 +52,25 @@ export class WhatsAppSession {
         fs.mkdirSync(targetProfilePath, { recursive: true });
       }
 
-      // Clean up stale lock file if present
-      const lockFile = path.join(targetProfilePath, 'SingletonLock');
-      if (fs.existsSync(lockFile)) {
-        try {
-          fs.unlinkSync(lockFile);
-        } catch {
-          // ignore
+      // Clean up stale Chromium lock files if present
+      const lockFiles = [
+        path.join(targetProfilePath, 'SingletonLock'),
+        path.join(targetProfilePath, 'SingletonCookie'),
+        path.join(targetProfilePath, 'SingletonSocket'),
+        path.join(targetProfilePath, 'Default', 'LOCK')
+      ];
+      for (const lf of lockFiles) {
+        if (fs.existsSync(lf)) {
+          try {
+            fs.unlinkSync(lf);
+          } catch {
+            // ignore if locked by active OS file handle
+          }
         }
       }
+
+      // Purge non-essential Chromium disk cache folders to keep profile lightweight
+      purgeChromiumCache(targetProfilePath);
 
       console.log(`[WhatsAppSession] Launching persistent Chromium context at ${targetProfilePath}...`);
 
@@ -73,7 +83,13 @@ export class WhatsAppSession {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu'
+          '--disable-gpu',
+          '--disk-cache-size=1048576',
+          '--media-cache-size=1048576',
+          '--disable-application-cache',
+          '--disable-gpu-shader-disk-cache',
+          '--aggressive-cache-discard',
+          '--disable-component-update'
         ],
         viewport: { width: 1280, height: 800 },
         userAgent:
@@ -245,5 +261,42 @@ export class WhatsAppSession {
       console.error('[WhatsAppSession] Error retrieving available groups:', err);
       return [];
     }
+  }
+}
+
+function purgeChromiumCache(targetProfilePath: string): void {
+  try {
+    const cacheDirs = [
+      path.join(targetProfilePath, 'Default', 'Cache'),
+      path.join(targetProfilePath, 'Default', 'Code Cache'),
+      path.join(targetProfilePath, 'Default', 'GPUCache'),
+      path.join(targetProfilePath, 'Default', 'DawnWebGPUCache'),
+      path.join(targetProfilePath, 'Default', 'DawnGraphiteCache'),
+      path.join(targetProfilePath, 'Default', 'Service Worker', 'CacheStorage'),
+      path.join(targetProfilePath, 'component_crx_cache'),
+      path.join(targetProfilePath, 'extensions_crx_cache'),
+      path.join(targetProfilePath, 'GPUPersistentCache'),
+    ];
+
+    for (const dir of cacheDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    if (fs.existsSync(targetProfilePath)) {
+      const files = fs.readdirSync(targetProfilePath);
+      for (const file of files) {
+        if (file.startsWith('BrowserMetrics') || file.startsWith('.com.google.chrome')) {
+          try {
+            fs.unlinkSync(path.join(targetProfilePath, file));
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[WhatsAppSession] Cache purge warning:', e);
   }
 }

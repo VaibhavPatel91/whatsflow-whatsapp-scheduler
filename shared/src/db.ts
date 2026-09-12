@@ -5,13 +5,38 @@ import { Schedule, ScheduledJob, WhatsAppConnectionRecord, WhatsAppStatus, JobSt
 
 export function getProjectRoot(): string {
   let current = __dirname;
-  while (current !== path.parse(current).root) {
-    if (fs.existsSync(path.join(current, 'database', 'schema.sql'))) {
+  while (current && current !== path.parse(current).root) {
+    if (
+      fs.existsSync(path.join(current, 'database', 'schema.sql')) ||
+      fs.existsSync(path.join(current, 'whatsapp_group_scheduler_ai_spec.md'))
+    ) {
       return current;
     }
     current = path.dirname(current);
   }
-  return process.cwd();
+
+  current = process.cwd();
+  while (current && current !== path.parse(current).root) {
+    if (
+      fs.existsSync(path.join(current, 'database', 'schema.sql')) ||
+      fs.existsSync(path.join(current, 'whatsapp_group_scheduler_ai_spec.md'))
+    ) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+
+  const cwd = process.cwd();
+  if (
+    cwd.endsWith('/backend') ||
+    cwd.endsWith('/worker') ||
+    cwd.endsWith('/frontend') ||
+    cwd.endsWith('/shared')
+  ) {
+    return path.dirname(cwd);
+  }
+
+  return cwd;
 }
 
 const dbDir = process.env.DB_DIR || path.join(getProjectRoot(), 'database');

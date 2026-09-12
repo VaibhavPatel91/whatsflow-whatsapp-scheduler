@@ -38,9 +38,16 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
   isProcessingQueue = true;
 
   try {
-    // 0. Verify live WhatsApp auth status if session is active
     const session = WhatsAppSession.getInstance();
-    if (session.getPage() && !session.getPage()?.isClosed()) {
+    const currentConn = connectionRepository.get();
+
+    // 0. If user requested verification or status is CONNECTING, trigger session initialization
+    if (currentConn.status === 'CONNECTING' || currentConn.status === 'DISCONNECTED') {
+      if (!session.getPage() || session.getPage()?.isClosed()) {
+        console.log('[Scheduler] Connection requested. Initializing Playwright session...');
+        await session.init().catch(() => {});
+      }
+    } else if (session.getPage() && !session.getPage()?.isClosed()) {
       await session.checkAuthStatus().catch(() => {});
     }
 
@@ -52,8 +59,7 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
     const dueJobs = jobRepository.getPendingJobsDue(nowIso);
 
     if (dueJobs.length > 0) {
-      // Auto-recover session ONLY when there are actual jobs due now
-      const session = WhatsAppSession.getInstance();
+      // Auto-recover session if page is inactive
       if (!session.getPage() || session.getPage()?.isClosed()) {
         console.log('[Scheduler] Pending job due and session page inactive. Initializing session...');
         await session.init().catch(() => {});
