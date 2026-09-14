@@ -41,11 +41,14 @@ export async function pollAndExecutePendingJobs(): Promise<void> {
     const session = WhatsAppSession.getInstance();
     const currentConn = connectionRepository.get();
 
-    // 0. If user requested verification or status is CONNECTING, trigger session initialization
+    // 0. If user requested verification or status is CONNECTING/DISCONNECTED, trigger session initialization or live auth check
     if (currentConn.status === 'CONNECTING' || currentConn.status === 'DISCONNECTED') {
       if (!session.getPage() || session.getPage()?.isClosed()) {
         console.log('[Scheduler] Connection requested. Initializing Playwright session...');
         await session.init().catch(() => {});
+      } else {
+        console.log('[Scheduler] Connection requested with active page. Verifying auth status...');
+        await session.checkAuthStatus().catch(() => {});
       }
     } else if (session.getPage() && !session.getPage()?.isClosed()) {
       await session.checkAuthStatus().catch(() => {});

@@ -292,10 +292,20 @@ export default function Dashboard() {
                 <button
                   onClick={handleConnect}
                   disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-xs transition border border-slate-700 flex items-center justify-center space-x-2"
+                  className={`w-full py-2.5 rounded-xl font-semibold text-xs transition border flex items-center justify-center space-x-2 ${
+                    waStatus.status === 'CONNECTED'
+                      ? 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/60'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-slate-950 border-emerald-500 font-bold shadow-lg shadow-emerald-600/20'
+                  }`}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{actionLoading ? 'Verifying Session in Browser...' : 'Verify Live Session in Browser'}</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${actionLoading ? 'animate-spin text-emerald-400' : waStatus.status === 'CONNECTED' ? 'text-slate-400' : 'text-slate-950'}`} />
+                  <span>
+                    {actionLoading
+                      ? 'Verifying Session in Browser...'
+                      : waStatus.status === 'CONNECTED'
+                      ? 'Re-verify Session in Browser'
+                      : 'Verify Live Session in Browser'}
+                  </span>
                 </button>
 
                 <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
