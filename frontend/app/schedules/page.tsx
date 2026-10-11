@@ -21,7 +21,8 @@ import {
   ArrowLeft,
   X,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  RotateCcw
 } from 'lucide-react';
 import { SchedulesTableSkeleton } from '@/components/skeletons';
 
@@ -367,13 +368,24 @@ export default function AllSchedulesPage() {
 
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-2">
-                          <Link
-                            href={`/schedule?id=${schedule.id}`}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition border border-slate-700"
-                            title="Edit Schedule"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </Link>
+                          {completed ? (
+                            <Link
+                              href={`/schedule?reuseId=${schedule.id}`}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition border border-emerald-500/30 text-xs font-semibold"
+                              title="Reuse Schedule (Create new task with same group & message)"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Reuse</span>
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/schedule?id=${schedule.id}`}
+                              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition border border-slate-700"
+                              title="Edit Schedule"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
                           <button
                             onClick={() => setScheduleToDelete(schedule)}
                             className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition border border-red-500/30"

@@ -3,16 +3,19 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import moment from 'moment';
-import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight, Target, Repeat } from 'lucide-react';
+import { Calendar, Clock, MessageSquare, Globe, CheckCircle2, ArrowRight, Target, Repeat, AlertCircle, RotateCcw } from 'lucide-react';
 import { ScheduleFormSkeleton } from '@/components/skeletons';
 
 function ScheduleForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scheduleIdParam = searchParams.get('id');
+  const reuseIdParam = searchParams.get('reuseId');
 
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [existingScheduleId, setExistingScheduleId] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isReusing, setIsReusing] = useState(false);
 
   const getTodayLocal = () => {
     const d = new Date();
@@ -22,12 +25,19 @@ function ScheduleForm() {
     return `${year}-${month}-${day}`;
   };
 
+  const getCurrentTimeLocal = () => {
+    const d = new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   // Form State
   const [groupName, setGroupName] = useState('');
   const [message1, setMessage1] = useState('Good morning everyone!');
   const [startDate, setStartDate] = useState(getTodayLocal);
   const [endDate, setEndDate] = useState('');
-  const [firstSendTime, setFirstSendTime] = useState('10:00');
+  const [firstSendTime, setFirstSendTime] = useState(getCurrentTimeLocal);
   const [timezone, setTimezone] = useState('Asia/Kolkata');
   const [enabled, setEnabled] = useState(true);
 
@@ -58,8 +68,26 @@ function ScheduleForm() {
         }
         setSuggestions(Array.from(groupNamesSet));
 
-        if (scheduleIdParam) {
-          const s = await fetch(`/api/schedules/${scheduleIdParam}`).then(r => r.json());
+        if (reuseIdParam) {
+          // Reusing a completed schedule: prefill group name & message, but save as a brand new schedule
+          const s = await fetch(`/api/schedules/${reuseIdParam}`).then(r => r.json()).catch(() => null);
+          if (s && s.id) {
+            setIsReusing(true);
+            setExistingScheduleId(null);
+            setIsCompleted(false);
+            setGroupName(s.group_name || '');
+            setMessage1(s.message_1 || '');
+            setStartDate(getTodayLocal());
+            setEndDate('');
+            setFirstSendTime(getCurrentTimeLocal());
+            setTimezone(s.timezone || 'Asia/Kolkata');
+            setEnabled(true);
+          }
+        } else if (scheduleIdParam) {
+          const [s, resJobs] = await Promise.all([
+            fetch(`/api/schedules/${scheduleIdParam}`).then(r => r.json()).catch(() => null),
+            fetch('/api/jobs?limit=200').then(r => r.json()).catch(() => [])
+          ]);
           if (s && s.id) {
             setExistingScheduleId(s.id);
             setGroupName(s.group_name);
@@ -69,6 +97,20 @@ function ScheduleForm() {
             setFirstSendTime(s.first_send_time);
             setTimezone(s.timezone || 'Asia/Kolkata');
             setEnabled(s.enabled);
+
+            // Determine if the schedule has already completed
+            const todayStr = getTodayLocal();
+            const sStart = s.start_date || s.target_date;
+            const sEnd = s.end_date;
+            const jobsList = Array.isArray(resJobs) ? resJobs : [];
+            const completed =
+              Boolean(sStart && !sEnd && sStart < todayStr) ||
+              Boolean(sStart && !sEnd && sStart === todayStr && jobsList.some((j: any) => j.schedule_id === s.id && j.status === 'SENT')) ||
+              Boolean(sEnd && sEnd < todayStr);
+
+            if (completed) {
+              setIsCompleted(true);
+            }
           }
         }
       } catch (err) {
@@ -79,7 +121,7 @@ function ScheduleForm() {
     };
 
     init();
-  }, [scheduleIdParam]);
+  }, [scheduleIdParam, reuseIdParam]);
 
   if (initializing) {
     return <ScheduleFormSkeleton />;
@@ -87,6 +129,10 @@ function ScheduleForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCompleted) {
+      setErrorMessage('Completed schedules cannot be edited.');
+      return;
+    }
     setSaving(true);
     setSuccessMessage('');
     setErrorMessage('');
@@ -129,8 +175,14 @@ function ScheduleForm() {
       }
 
       if (res.ok) {
-        setSuccessMessage(existingScheduleId ? 'Task updated & activated!' : 'New task scheduled & activated!');
-        setTimeout(() => router.push('/'), 1200);
+        setSuccessMessage(
+          isReusing
+            ? 'New task created & activated from previous task!'
+            : existingScheduleId
+            ? 'Task updated & activated!'
+            : 'New task scheduled & activated!'
+        );
+        setTimeout(() => router.push(isReusing ? '/schedules' : '/'), 1200);
       } else {
         const errData = await res.json();
         setErrorMessage(errData.error || 'Failed to save task.');
@@ -146,13 +198,34 @@ function ScheduleForm() {
     <div className="max-w-3xl mx-auto space-y-8">
       <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 backdrop-blur-xl">
         <h1 className="text-2xl font-bold text-slate-100 flex items-center space-x-2">
-          <Calendar className="w-6 h-6 text-emerald-400" />
-          <span>{existingScheduleId ? 'Edit Scheduled Task' : 'Schedule New Task'}</span>
+          {isReusing ? (
+            <RotateCcw className="w-6 h-6 text-emerald-400" />
+          ) : (
+            <Calendar className="w-6 h-6 text-emerald-400" />
+          )}
+          <span>
+            {isReusing
+              ? 'Reuse Task as New Schedule'
+              : existingScheduleId
+              ? 'Edit Scheduled Task'
+              : 'Schedule New Task'}
+          </span>
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Configure an automated WhatsApp message task for a daily schedule, date range, or specific single date.
+          {isReusing
+            ? `Prefilled group name and message. Choose your new dispatch date and time to save as a new task.`
+            : 'Configure an automated WhatsApp message task for a daily schedule, date range, or specific single date.'}
         </p>
       </div>
+
+      {isReusing && (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-4 rounded-xl text-xs flex items-center space-x-2.5">
+          <RotateCcw className="w-4 h-4 text-emerald-400 shrink-0" />
+          <p className="leading-relaxed">
+            <strong className="text-emerald-200">Reusing Task:</strong> WhatsApp group and message have been prefilled. Set your desired send date and time below to save this as a new schedule.
+          </p>
+        </div>
+      )}
 
       {successMessage && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-xl text-sm flex items-center space-x-2">
@@ -164,6 +237,39 @@ function ScheduleForm() {
       {errorMessage && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-sm break-words max-w-full overflow-hidden">
           {errorMessage}
+        </div>
+      )}
+
+      {isCompleted && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 p-4 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold text-amber-200">Completed Schedule (Read-Only)</p>
+              <p className="text-[11px] text-amber-300/80">
+                This schedule has already finished its execution and cannot be edited.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {existingScheduleId && (
+              <button
+                type="button"
+                onClick={() => router.push(`/schedule?reuseId=${existingScheduleId}`)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shrink-0 flex items-center space-x-1"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reuse as New</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => router.push('/schedules')}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition shrink-0"
+            >
+              Back to Schedules
+            </button>
+          </div>
         </div>
       )}
 
@@ -179,7 +285,8 @@ function ScheduleForm() {
             placeholder="Type group name or select from suggestions (e.g. Finance, Office)"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition"
+            disabled={isCompleted}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
             required
           />
           <datalist id="group-suggestions">
@@ -202,8 +309,9 @@ function ScheduleForm() {
             rows={4}
             value={message1}
             onChange={(e) => setMessage1(e.target.value)}
+            disabled={isCompleted}
             placeholder="Type your WhatsApp message content here..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition resize-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-sm focus:outline-none focus:border-emerald-500 transition resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             required
           />
         </div>
@@ -221,7 +329,8 @@ function ScheduleForm() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                disabled={isCompleted}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -233,7 +342,7 @@ function ScheduleForm() {
                   <Calendar className="w-3.5 h-3.5 text-emerald-400" />
                   <span>End Date <span className="text-slate-500 font-normal">(Optional)</span></span>
                 </label>
-                {endDate && (
+                {endDate && !isCompleted && (
                   <button
                     type="button"
                     onClick={() => setEndDate('')}
@@ -247,7 +356,8 @@ function ScheduleForm() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                disabled={isCompleted}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -261,7 +371,8 @@ function ScheduleForm() {
                 type="time"
                 value={firstSendTime}
                 onChange={(e) => setFirstSendTime(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                disabled={isCompleted}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 required
               />
             </div>
@@ -275,7 +386,8 @@ function ScheduleForm() {
               <select
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition"
+                disabled={isCompleted}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-xs focus:outline-none focus:border-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                 <option value="UTC">UTC</option>
@@ -334,9 +446,10 @@ function ScheduleForm() {
             id="enabled"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="w-5 h-5 accent-emerald-500 rounded cursor-pointer"
+            disabled={isCompleted}
+            className="w-5 h-5 accent-emerald-500 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <label htmlFor="enabled" className="text-sm font-semibold text-slate-200 cursor-pointer">
+          <label htmlFor="enabled" className={`text-sm font-semibold text-slate-200 ${isCompleted ? 'cursor-not-allowed text-slate-400' : 'cursor-pointer'}`}>
             Enable This Task
           </label>
         </div>
@@ -345,11 +458,25 @@ function ScheduleForm() {
         <div className="pt-4">
           <button
             type="submit"
-            disabled={saving}
-            className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2"
+            disabled={saving || isCompleted}
+            className={`w-full py-3.5 rounded-xl font-bold text-sm transition shadow-lg flex items-center justify-center space-x-2 ${
+              isCompleted
+                ? 'bg-slate-800/80 text-slate-500 border border-slate-700/60 cursor-not-allowed'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+            }`}
           >
-            <span>{saving ? 'Saving Task...' : existingScheduleId ? 'Update Task' : 'Save & Activate Task'}</span>
-            <ArrowRight className="w-4 h-4" />
+            <span>
+              {saving
+                ? 'Saving Task...'
+                : isCompleted
+                ? 'Completed Task (Editing Disabled)'
+                : isReusing
+                ? 'Save as New Schedule'
+                : existingScheduleId
+                ? 'Update Task'
+                : 'Save & Activate Task'}
+            </span>
+            {!isCompleted && <ArrowRight className="w-4 h-4" />}
           </button>
         </div>
       </form>

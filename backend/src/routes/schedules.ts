@@ -94,6 +94,27 @@ schedulesRouter.patch('/:id', (req: Request, res: Response) => {
     const existing = scheduleRepository.getById(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Schedule not found' });
 
+    // Disallow editing completed schedules
+    const startDate = existing.start_date || existing.target_date;
+    const endDate = existing.end_date;
+    const now = DateTime.now().setZone(existing.timezone || 'Asia/Kolkata');
+    const todayStr = now.toFormat('yyyy-MM-dd');
+
+    let isCompleted = false;
+    if (startDate && !endDate && startDate < todayStr) {
+      isCompleted = true;
+    } else if (startDate && !endDate && startDate === todayStr) {
+      const db = require('../../../shared/src/db').getDb();
+      const sentJob = db.prepare("SELECT id FROM scheduled_jobs WHERE schedule_id = ? AND status = 'SENT' LIMIT 1").get(existing.id);
+      if (sentJob) isCompleted = true;
+    } else if (endDate && endDate < todayStr) {
+      isCompleted = true;
+    }
+
+    if (isCompleted) {
+      return res.status(400).json({ error: 'Completed schedules cannot be edited.' });
+    }
+
     const updated = scheduleRepository.update(req.params.id, {
       group_id: req.body.groupId,
       group_name: req.body.groupName,
